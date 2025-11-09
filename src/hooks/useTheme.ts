@@ -2,19 +2,22 @@ import { useEffect, useState } from 'react';
 
 type Theme = 'light' | 'dark';
 
+// 初始化主题：从 localStorage 读取或使用系统偏好
+function getInitialTheme(): Theme {
+  // 先检查 localStorage
+  const stored = localStorage.getItem('theme');
+  if (stored === 'dark' || stored === 'light') {
+    return stored as Theme;
+  }
+
+  // 如果没有存储，使用系统偏好
+  const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+
+  return systemTheme;
+}
+
 export function useTheme() {
-  const [theme, setTheme] = useState<Theme>('light');
-
-  useEffect(() => {
-    // Get stored theme or system preference
-    const stored = localStorage.getItem('theme');
-    const isValidTheme = stored === 'dark' || stored === 'light';
-    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
-      ? 'dark'
-      : 'light';
-
-    setTheme(isValidTheme ? (stored as Theme) : systemTheme);
-  }, []);
+  const [theme, setTheme] = useState<Theme>(() => getInitialTheme());
 
   useEffect(() => {
     // Apply theme to document

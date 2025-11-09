@@ -7,6 +7,19 @@
     <meta name="description" content="GC Code - 支持 Claude 等多种 AI 模型" />
     <meta name="keywords" content="GC Code,AI,Claude,API" />
     <title>GC Code</title>
+    <!-- 防止主题闪烁：在页面加载前应用主题 -->
+    <script>
+      (function() {
+        const stored = localStorage.getItem('theme');
+        const theme = (stored === 'dark' || stored === 'light')
+          ? stored
+          : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+
+        if (theme === 'dark') {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
