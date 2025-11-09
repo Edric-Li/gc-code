@@ -23,7 +23,7 @@ export default function Home() {
             </h1>
 
             <p className="animate-slide-up mt-10 text-xl text-gray-600 dark:text-gray-300 sm:text-2xl md:text-3xl">
-              统一接入 Claude、Codex 等多种 AI 服务
+              支持 Claude、Kimi、GLM 等多种 AI 模型
             </p>
 
             <p className="animate-slide-up mt-6 text-base text-gray-500 dark:text-gray-400 sm:text-lg md:text-xl">

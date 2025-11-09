@@ -1,8 +1,7 @@
 import { Link } from 'react-router-dom';
-import { Github } from 'lucide-react';
 import Logo from '@/components/common/Logo';
 import ThemeToggle from '@/components/ui/ThemeToggle';
-import { navConfig, siteConfig } from '@/config/site';
+import { navConfig } from '@/config/site';
 
 export default function Header() {
   return (
@@ -29,15 +28,6 @@ export default function Header() {
 
           {/* Actions */}
           <div className="flex items-center gap-2">
-            <a
-              href={siteConfig.links.github}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-lg p-2 text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
-              aria-label="GitHub"
-            >
-              <Github className="h-5 w-5" />
-            </a>
             <ThemeToggle />
           </div>
         </div>
