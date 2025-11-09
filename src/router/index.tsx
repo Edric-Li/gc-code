@@ -6,6 +6,7 @@ import Loading from '@/components/common/Loading';
 const Home = lazy(() => import('@/pages/Home'));
 const Docs = lazy(() => import('@/pages/Docs'));
 const ApiEndpoints = lazy(() => import('@/pages/ApiEndpoints'));
+const Usage = lazy(() => import('@/pages/Usage'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
 
 function AppRouter() {
@@ -15,6 +16,7 @@ function AppRouter() {
         <Route path="/" element={<Home />} />
         <Route path="/docs/*" element={<Docs />} />
         <Route path="/api" element={<ApiEndpoints />} />
+        <Route path="/usage" element={<Usage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>

@@ -23,6 +23,10 @@ export const navConfig = {
       title: 'API 地址',
       href: '/api',
     },
+    {
+      title: '用量查询',
+      href: '/usage',
+    },
   ],
   sidebarNav: [
     {
