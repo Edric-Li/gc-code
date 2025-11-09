@@ -20,6 +20,10 @@ export const navConfig = {
       href: '/docs',
     },
     {
+      title: 'MCP 精选',
+      href: '/mcp',
+    },
+    {
       title: 'API 地址',
       href: '/api',
     },
