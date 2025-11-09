@@ -1,0 +1,190 @@
+name: Auto Release
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    # 跳过由 GitHub Actions 创建的提交，避免死循环
+    if: github.event.pusher.name != 'github-actions[bot]' && !contains(github.event.head_commit.message, '[skip ci]')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check if version bump is needed
+        id: check
+        run: |
+          # 获取最近的变更文件
+          CHANGED_FILES=$(git diff --name-only HEAD~1..HEAD 2>/dev/null || git diff --name-only $(git rev-list --max-parents=0 HEAD)..HEAD)
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          # 检查是否只有无关文件（.md, docs/, .github/等）
+          SIGNIFICANT_CHANGES=false
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+
+            if [[ ! "$file" =~ \.(md|txt)$ ]] &&
+               [[ ! "$file" =~ ^docs/ ]] &&
+               [[ ! "$file" =~ ^\.github/ ]] &&
+               [[ "$file" != "VERSION" ]] &&
+               [[ "$file" != ".gitignore" ]] &&
+               [[ "$file" != "LICENSE" ]]; then
+              echo "Found significant change in: $file"
+              SIGNIFICANT_CHANGES=true
+              break
+            fi
+          done <<< "$CHANGED_FILES"
+
+          if [ "$SIGNIFICANT_CHANGES" = true ]; then
+            echo "needs_bump=true" >> $GITHUB_OUTPUT
+          else
+            echo "needs_bump=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get current version
+        if: steps.check.outputs.needs_bump == 'true'
+        id: get_version
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $LATEST_TAG"
+          VERSION=${LATEST_TAG#v}
+          echo "current_version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Calculate next version
+        if: steps.check.outputs.needs_bump == 'true'
+        id: next_version
+        run: |
+          VERSION="${{ steps.get_version.outputs.current_version }}"
+          IFS='.' read -r -a version_parts <<< "$VERSION"
+          MAJOR="${version_parts[0]:-0}"
+          MINOR="${version_parts[1]:-0}"
+          PATCH="${version_parts[2]:-0}"
+
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+
+          echo "New version: $NEW_VERSION"
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "new_tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        if: steps.check.outputs.needs_bump == 'true'
+        id: changelog
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -n "$LATEST_TAG" ]; then
+            CHANGELOG=$(git log $LATEST_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          else
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges | head -20)
+          fi
+
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="- 代码优化和改进"
+          fi
+
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create and push tag
+        if: steps.check.outputs.needs_bump == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          NEW_TAG="${{ steps.next_version.outputs.new_tag }}"
+          git tag -a "$NEW_TAG" -m "Release $NEW_TAG"
+          git push origin "$NEW_TAG"
+
+      - name: Set up QEMU
+        if: steps.check.outputs.needs_bump == 'true'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        if: steps.check.outputs.needs_bump == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        if: steps.check.outputs.needs_bump == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Log in to GitHub Container Registry
+        if: steps.check.outputs.needs_bump == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        if: steps.check.outputs.needs_bump == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            edricli7/gc-code-portal:${{ steps.next_version.outputs.new_tag }}
+            edricli7/gc-code-portal:${{ steps.next_version.outputs.new_version }}
+            edricli7/gc-code-portal:latest
+            ghcr.io/${{ github.repository_owner }}/gc-code-portal:${{ steps.next_version.outputs.new_tag }}
+            ghcr.io/${{ github.repository_owner }}/gc-code-portal:${{ steps.next_version.outputs.new_version }}
+            ghcr.io/${{ github.repository_owner }}/gc-code-portal:latest
+          labels: |
+            org.opencontainers.image.version=${{ steps.next_version.outputs.new_version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Create GitHub Release
+        if: steps.check.outputs.needs_bump == 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.next_version.outputs.new_tag }}
+          name: Release ${{ steps.next_version.outputs.new_version }}
+          body: |
+            ## 🐳 Docker 镜像
+
+            ```bash
+            # Docker Hub
+            docker pull edricli7/gc-code-portal:${{ steps.next_version.outputs.new_tag }}
+            docker pull edricli7/gc-code-portal:latest
+
+            # GitHub Container Registry
+            docker pull ghcr.io/${{ github.repository_owner }}/gc-code-portal:${{ steps.next_version.outputs.new_tag }}
+            docker pull ghcr.io/${{ github.repository_owner }}/gc-code-portal:latest
+            ```
+
+            ## 📦 更新内容
+
+            ${{ steps.changelog.outputs.content }}
+
+            ## 🚀 使用方式
+
+            ```bash
+            # 使用 Docker 运行
+            docker run -d -p 80:80 edricli7/gc-code-portal:${{ steps.next_version.outputs.new_tag }}
+
+            # 使用 Docker Compose
+            docker-compose up -d
+            ```
+          draft: false
+          prerelease: false
+          generate_release_notes: true

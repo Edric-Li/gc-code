@@ -1,0 +1,9 @@
+version: '3.8'
+
+services:
+  web:
+    image: edricli7/gc-code-portal:latest
+    container_name: gc-code-portal
+    ports:
+      - "80:80"
+    restart: unless-stopped

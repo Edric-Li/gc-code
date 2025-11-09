@@ -1,5 +1,10 @@
 # GC Code Portal
 
+[![Docker Build & Push](https://github.com/edricli7/gc-code1/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/edricli7/gc-code1/actions/workflows/docker-publish.yml)
+[![Auto Release](https://github.com/edricli7/gc-code1/actions/workflows/auto-release.yml/badge.svg)](https://github.com/edricli7/gc-code1/actions/workflows/auto-release.yml)
+[![Docker Hub](https://img.shields.io/docker/pulls/edricli7/gc-code-portal?logo=docker)](https://hub.docker.com/r/edricli7/gc-code-portal)
+[![Docker Image Size](https://img.shields.io/docker/image-size/edricli7/gc-code-portal/latest?logo=docker)](https://hub.docker.com/r/edricli7/gc-code-portal)
+
 > 统一接入 Claude、Codex 等多种 AI 服务的门户网站
 
 ## 特性
@@ -22,13 +27,30 @@
 
 ## 快速开始
 
-### 安装依赖
+### 方式 1: 使用 Docker（推荐）
+
+```bash
+# 拉取最新镜像
+docker pull edricli7/gc-code-portal:latest
+
+# 运行容器
+docker run -d -p 80:80 edricli7/gc-code-portal:latest
+
+# 或使用 docker-compose
+docker-compose up -d
+```
+
+访问 http://localhost
+
+### 方式 2: 本地开发
+
+#### 安装依赖
 
 ```bash
 npm install
 ```
 
-### 开发模式
+#### 开发模式
 
 ```bash
 npm run dev
@@ -36,13 +58,13 @@ npm run dev
 
 访问 http://localhost:3000
 
-### 构建生产版本
+#### 构建生产版本
 
 ```bash
 npm run build
 ```
 
-### 预览生产版本
+#### 预览生产版本
 
 ```bash
 npm run preview
@@ -148,6 +170,8 @@ gc-code-portal/
 - [产品文档](./GC_Code_产品文档_v1.0.md)
 - [实施计划](./GC_Code_V1实施计划.md)
 - [代码质量](./CODE_QUALITY.md)
+- [GitHub Actions 使用指南](./.github/WORKFLOW_USAGE.md)
+- [Docker 部署](./docker-compose.yml)
 
 ## 许可证
 
