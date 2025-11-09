@@ -97,7 +97,7 @@ export default function ApiEndpoints() {
             {/* API 地址列表 - 紧凑样式 */}
             <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
               <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                {DEPARTMENT_ENDPOINTS.map((endpoint, index) => (
+                {DEPARTMENT_ENDPOINTS.map((endpoint) => (
                   <div
                     key={endpoint.url}
                     className="group relative px-6 py-5 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"

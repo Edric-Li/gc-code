@@ -6,7 +6,7 @@ import { siteConfig } from '@/config/site';
 
 export default function NotFound() {
   return (
-    <PageLayout showFooter={false}>
+    <PageLayout>
       <Helmet>
         <title>404 - 页面未找到 - {siteConfig.name}</title>
       </Helmet>
