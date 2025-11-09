@@ -16,7 +16,7 @@ export const navConfig = {
       href: '/',
     },
     {
-      title: '文档',
+      title: '文档中心',
       href: '/docs',
     },
     {
@@ -24,8 +24,8 @@ export const navConfig = {
       href: '/mcp',
     },
     {
-      title: 'API 地址',
-      href: '/api',
+      title: '经验分享',
+      href: '/experience',
     },
     {
       title: '用量查询',
