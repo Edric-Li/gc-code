@@ -23,11 +23,11 @@ export default function Home() {
             </h1>
 
             <p className="animate-slide-up mt-10 text-xl text-gray-600 dark:text-gray-300 sm:text-2xl md:text-3xl">
-              支持 Claude、Kimi、GLM 等多种 AI 模型
+              为 GC 开发人员提供 AI 编程助手服务
             </p>
 
             <p className="animate-slide-up mt-6 text-base text-gray-500 dark:text-gray-400 sm:text-lg md:text-xl">
-              🔒 私有部署 · ⚡ 高性能 · 🛡️ 安全可控
+              支持 ClaudeCode、Kimi、GLM 等多种 AI 模型
             </p>
 
             <div className="animate-slide-up mt-14 flex flex-col items-center justify-center gap-5 sm:flex-row">
@@ -35,8 +35,8 @@ export default function Home() {
                 快速开始
                 <ArrowRight className="ml-2 h-6 w-6" />
               </Link>
-              <Link to="/api" className="btn-secondary btn-lg w-full sm:w-auto px-8 py-4 text-lg">
-                查看 API 地址
+              <Link to="/usage" className="btn-secondary btn-lg w-full sm:w-auto px-8 py-4 text-lg">
+                用量查询
               </Link>
             </div>
           </div>
