@@ -17,7 +17,6 @@ permissions:
 
 env:
   DOCKER_IMAGE: edricli7/gc-code-portal
-  GHCR_IMAGE: ghcr.io/${{ github.repository_owner }}/gc-code-portal
 
 jobs:
   build-and-push:
@@ -25,6 +24,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Prepare image names
+        id: image_names
+        run: |
+          # 将 repository_owner 转换为小写
+          OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "ghcr_image=ghcr.io/${OWNER_LOWER}/gc-code-portal" >> $GITHUB_OUTPUT
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -53,7 +59,7 @@ jobs:
         with:
           images: |
             ${{ env.DOCKER_IMAGE }}
-            ${{ env.GHCR_IMAGE }}
+            ${{ steps.image_names.outputs.ghcr_image }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr

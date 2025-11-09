@@ -109,6 +109,14 @@ jobs:
           git tag -a "$NEW_TAG" -m "Release $NEW_TAG"
           git push origin "$NEW_TAG"
 
+      - name: Prepare image names
+        if: steps.check.outputs.needs_bump == 'true'
+        id: image_names
+        run: |
+          # 将 repository_owner 转换为小写
+          OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "ghcr_owner=${OWNER_LOWER}" >> $GITHUB_OUTPUT
+
       - name: Set up QEMU
         if: steps.check.outputs.needs_bump == 'true'
         uses: docker/setup-qemu-action@v3
@@ -143,9 +151,9 @@ jobs:
             edricli7/gc-code-portal:${{ steps.next_version.outputs.new_tag }}
             edricli7/gc-code-portal:${{ steps.next_version.outputs.new_version }}
             edricli7/gc-code-portal:latest
-            ghcr.io/${{ github.repository_owner }}/gc-code-portal:${{ steps.next_version.outputs.new_tag }}
-            ghcr.io/${{ github.repository_owner }}/gc-code-portal:${{ steps.next_version.outputs.new_version }}
-            ghcr.io/${{ github.repository_owner }}/gc-code-portal:latest
+            ghcr.io/${{ steps.image_names.outputs.ghcr_owner }}/gc-code-portal:${{ steps.next_version.outputs.new_tag }}
+            ghcr.io/${{ steps.image_names.outputs.ghcr_owner }}/gc-code-portal:${{ steps.next_version.outputs.new_version }}
+            ghcr.io/${{ steps.image_names.outputs.ghcr_owner }}/gc-code-portal:latest
           labels: |
             org.opencontainers.image.version=${{ steps.next_version.outputs.new_version }}
             org.opencontainers.image.revision=${{ github.sha }}
@@ -168,8 +176,8 @@ jobs:
             docker pull edricli7/gc-code-portal:latest
 
             # GitHub Container Registry
-            docker pull ghcr.io/${{ github.repository_owner }}/gc-code-portal:${{ steps.next_version.outputs.new_tag }}
-            docker pull ghcr.io/${{ github.repository_owner }}/gc-code-portal:latest
+            docker pull ghcr.io/${{ steps.image_names.outputs.ghcr_owner }}/gc-code-portal:${{ steps.next_version.outputs.new_tag }}
+            docker pull ghcr.io/${{ steps.image_names.outputs.ghcr_owner }}/gc-code-portal:latest
             ```
 
             ## 📦 更新内容
