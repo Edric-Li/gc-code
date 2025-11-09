@@ -1,5 +1,5 @@
 import { Helmet } from 'react-helmet-async';
-import { Github, Globe, Chrome, Sparkles, ExternalLink, Trello } from 'lucide-react';
+import { Github, Chrome, Sparkles, Trello } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
 
 interface McpServer {
