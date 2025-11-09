@@ -34,6 +34,14 @@ export default function ClaudeInstallation() {
           本指南将帮助你快速搭建 Claude 开发环境，开始使用 Claude API。
         </p>
 
+        <Callout type="warning" title="开始之前">
+          在安装和使用 Claude API 之前，请务必先阅读
+          <a href="/docs/usage-guidelines" className="ml-1 font-semibold text-primary-600">
+            使用须知
+          </a>
+          ，了解额度限制、使用规范和安全要求。
+        </Callout>
+
         {/* 前置要求 */}
         <h2 id="prerequisites">前置要求</h2>
         <p>在开始之前，请确保你已经准备好以下内容：</p>
@@ -238,16 +246,6 @@ console.log(answer);`}
           >
             <h4 className="mb-2 font-semibold text-gray-900 dark:text-gray-100">快速开始</h4>
             <p className="text-sm text-gray-600 dark:text-gray-400">学习如何发送第一个请求</p>
-          </a>
-
-          <a
-            href="/docs/claude/api-usage"
-            className="block rounded-lg border border-gray-200 p-4 transition-all hover:border-primary-300 hover:bg-primary-50 dark:border-gray-700 dark:hover:border-primary-700 dark:hover:bg-primary-950/30"
-          >
-            <h4 className="mb-2 font-semibold text-gray-900 dark:text-gray-100">API 使用</h4>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              深入了解 Claude API 的各种功能
-            </p>
           </a>
         </div>
 

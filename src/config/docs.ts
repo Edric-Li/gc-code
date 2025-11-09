@@ -16,6 +16,15 @@ export interface DocSection {
 
 export const docsConfig: DocSection[] = [
   {
+    title: '使用须知',
+    items: [
+      {
+        title: '使用须知',
+        href: '/docs/usage-guidelines',
+      },
+    ],
+  },
+  {
     title: 'Claude 指南',
     items: [
       {
@@ -29,10 +38,6 @@ export const docsConfig: DocSection[] = [
       {
         title: '快速开始',
         href: '/docs/claude/quick-start',
-      },
-      {
-        title: 'API 使用',
-        href: '/docs/claude/api-usage',
       },
       {
         title: '高级功能',

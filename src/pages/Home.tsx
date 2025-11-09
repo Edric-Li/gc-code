@@ -35,8 +35,8 @@ export default function Home() {
                 快速开始
                 <ArrowRight className="ml-2 h-6 w-6" />
               </Link>
-              <Link to="/docs" className="btn-secondary btn-lg w-full sm:w-auto px-8 py-4 text-lg">
-                查看文档
+              <Link to="/api" className="btn-secondary btn-lg w-full sm:w-auto px-8 py-4 text-lg">
+                查看 API 地址
               </Link>
             </div>
           </div>

@@ -20,11 +20,7 @@ export const navConfig = {
       href: '/docs',
     },
     {
-      title: '指南',
-      href: '/guides',
-    },
-    {
-      title: 'API',
+      title: 'API 地址',
       href: '/api',
     },
   ],
