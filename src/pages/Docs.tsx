@@ -4,23 +4,23 @@ import PageLayout from '@/components/layout/PageLayout';
 import Loading from '@/components/common/Loading';
 
 // Lazy load doc pages
-const Overview = lazy(() => import('@/pages/docs/Overview'));
-const Installation = lazy(() => import('@/pages/docs/Installation'));
+const ClaudeIntroduction = lazy(() => import('@/pages/docs/claude/Introduction'));
+const ClaudeInstallation = lazy(() => import('@/pages/docs/claude/Installation'));
 
 export default function Docs() {
   return (
     <PageLayout>
       <Suspense fallback={<Loading />}>
         <Routes>
-          {/* 默认重定向到概述页 */}
-          <Route path="/" element={<Navigate to="/docs/getting-started/overview" replace />} />
+          {/* 默认重定向到 Claude 介绍页 */}
+          <Route path="/" element={<Navigate to="/docs/claude/introduction" replace />} />
 
-          {/* 快速开始 */}
-          <Route path="/getting-started/overview" element={<Overview />} />
-          <Route path="/getting-started/installation" element={<Installation />} />
+          {/* Claude 指南 */}
+          <Route path="/claude/introduction" element={<ClaudeIntroduction />} />
+          <Route path="/claude/installation" element={<ClaudeInstallation />} />
 
           {/* 其他路由后续添加 */}
-          <Route path="*" element={<Navigate to="/docs/getting-started/overview" replace />} />
+          <Route path="*" element={<Navigate to="/docs/claude/introduction" replace />} />
         </Routes>
       </Suspense>
     </PageLayout>

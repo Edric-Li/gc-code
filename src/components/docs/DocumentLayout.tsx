@@ -33,19 +33,20 @@ export default function DocumentLayout({ children }: DocumentLayoutProps) {
         </button>
       </div>
 
-      <div className="flex">
-        {/* 左侧导航栏 - 移动端抽屉式，桌面端固定显示 */}
-        <DocSidebar
-          className={`
-            fixed top-16 bottom-0 left-0 z-50 w-[280px] transform transition-transform
-            lg:relative lg:top-0 lg:z-0 lg:block lg:h-auto lg:min-h-screen lg:translate-x-0
-            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-          `}
-        />
+      {/* 左侧导航栏 - 移动端抽屉式，桌面端固定显示 */}
+      <DocSidebar
+        className={`
+          fixed top-16 bottom-0 z-50 w-[280px] transform transition-transform
+          ${sidebarOpen ? 'left-0 translate-x-0' : 'left-0 -translate-x-full'}
+          lg:translate-x-0
+          lg:left-[max(0px,calc((100vw-1536px)/2))]
+        `}
+      />
 
-        {/* 主内容区 */}
-        <main className="min-h-screen w-full min-w-0 flex-1">
-          <div className="mx-auto w-full max-w-screen-xl px-4 sm:px-6 lg:px-8">
+      {/* 主内容区 - 添加左边距为菜单预留空间 */}
+      <div className="mx-auto w-full max-w-screen-2xl lg:pl-[280px]">
+        <main className="min-h-screen w-full">
+          <div className="px-4 sm:px-6 lg:px-8">
             <div className="flex gap-8 py-8 lg:gap-12">
               {/* 文档内容 */}
               <article className="doc-content min-w-0 max-w-4xl flex-1">{children}</article>
