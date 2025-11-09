@@ -14,7 +14,7 @@ export default function DocSidebar({ className = '' }: DocSidebarProps) {
     <aside
       className={`border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 ${className}`}
     >
-      <nav className="h-full overflow-y-auto px-4 py-6">
+      <nav className="h-full overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
         <div className="space-y-8">
           {docsConfig.map((section) => (
             <div key={section.title}>

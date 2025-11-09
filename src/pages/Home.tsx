@@ -13,9 +13,9 @@ export default function Home() {
       </Helmet>
 
       {/* Hero Section */}
-      <section className="gradient-bg min-h-[85vh] flex items-center py-24 md:py-32">
+      <section className="gradient-bg flex flex-1 items-center justify-center">
         <div className="container-custom w-full">
-          <div className="mx-auto max-w-5xl text-center">
+          <div className="mx-auto max-w-5xl text-center py-12">
             <h1 className="animate-fade-in text-6xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-7xl md:text-8xl lg:text-9xl">
               <span className="block bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent">
                 GC Code
@@ -23,15 +23,18 @@ export default function Home() {
             </h1>
 
             <p className="animate-slide-up mt-10 text-xl text-gray-600 dark:text-gray-300 sm:text-2xl md:text-3xl">
-              为 GC 开发人员提供 AI 编程助手服务
+              为 GC 内部人员提供 AI 编程助手服务
             </p>
 
             <p className="animate-slide-up mt-6 text-base text-gray-500 dark:text-gray-400 sm:text-lg md:text-xl">
-              支持 ClaudeCode、Kimi、GLM 等多种 AI 模型
+              支持 Claude、Kimi、GLM 等多种 AI 模型
             </p>
 
             <div className="animate-slide-up mt-14 flex flex-col items-center justify-center gap-5 sm:flex-row">
-              <Link to="/docs" className="btn-primary btn-lg w-full sm:w-auto px-8 py-4 text-lg">
+              <Link
+                to="/docs/quick-start/installation"
+                className="btn-primary btn-lg w-full sm:w-auto px-8 py-4 text-lg"
+              >
                 快速开始
                 <ArrowRight className="ml-2 h-6 w-6" />
               </Link>

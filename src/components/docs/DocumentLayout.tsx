@@ -36,7 +36,7 @@ export default function DocumentLayout({ children }: DocumentLayoutProps) {
       {/* 左侧导航栏 - 移动端抽屉式，桌面端固定显示 */}
       <DocSidebar
         className={`
-          fixed top-16 bottom-0 z-50 w-[280px] transform transition-transform
+          fixed top-16 bottom-0 z-30 w-[280px] transform transition-transform
           ${sidebarOpen ? 'left-0 translate-x-0' : 'left-0 -translate-x-full'}
           lg:translate-x-0
           lg:left-[max(0px,calc((100vw-1536px)/2))]

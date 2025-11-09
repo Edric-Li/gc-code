@@ -13,21 +13,20 @@ export default function Header() {
             <Logo />
           </Link>
 
-          {/* Navigation */}
-          <nav className="hidden md:flex items-center gap-6">
-            {navConfig.mainNav.map((item) => (
-              <Link
-                key={item.href}
-                to={item.href}
-                className="text-sm font-medium text-gray-700 hover:text-primary-600 dark:text-gray-300 dark:hover:text-primary-400 transition-colors"
-              >
-                {item.title}
-              </Link>
-            ))}
-          </nav>
+          {/* Navigation & Actions */}
+          <div className="flex items-center gap-8">
+            <nav className="hidden md:flex items-center gap-8">
+              {navConfig.mainNav.map((item) => (
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  className="text-sm font-medium text-gray-700 hover:text-primary-600 dark:text-gray-300 dark:hover:text-primary-400 transition-colors"
+                >
+                  {item.title}
+                </Link>
+              ))}
+            </nav>
 
-          {/* Actions */}
-          <div className="flex items-center gap-2">
             <ThemeToggle />
           </div>
         </div>

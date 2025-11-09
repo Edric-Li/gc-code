@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Info } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
 import ApiKeyManager from '@/components/usage/ApiKeyManager';
 import UsageStatsOverview from '@/components/usage/UsageStatsOverview';
@@ -166,6 +166,51 @@ export default function Usage() {
               >
                 设置 API Key
               </button>
+
+              {/* API Key 查询提示 */}
+              <div className="mt-8 max-w-2xl rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800/50">
+                <div className="flex items-start gap-4">
+                  <div className="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
+                    <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                      不知道 API Key？
+                    </h3>
+                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                      您可以通过以下管理平台查询您的 API Key
+                    </p>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <a
+                        href="http://xa-office-mgmt/claudemanagement"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group flex flex-col rounded-lg border border-gray-200 bg-gray-50 p-4 transition-all hover:border-primary-300 hover:bg-primary-50 hover:shadow-md dark:border-gray-700 dark:bg-gray-800/80 dark:hover:border-primary-600 dark:hover:bg-primary-900/20"
+                      >
+                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                          内网访问
+                        </span>
+                        <span className="mt-1 text-sm font-medium text-gray-900 group-hover:text-primary-600 dark:text-gray-200 dark:group-hover:text-primary-400">
+                          xa-office-mgmt
+                        </span>
+                      </a>
+                      <a
+                        href="https://xaoa.grapecity.com.cn/claudemanagement"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group flex flex-col rounded-lg border border-gray-200 bg-gray-50 p-4 transition-all hover:border-primary-300 hover:bg-primary-50 hover:shadow-md dark:border-gray-700 dark:bg-gray-800/80 dark:hover:border-primary-600 dark:hover:bg-primary-900/20"
+                      >
+                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                          外网访问
+                        </span>
+                        <span className="mt-1 text-sm font-medium text-gray-900 group-hover:text-primary-600 dark:text-gray-200 dark:group-hover:text-primary-400">
+                          xaoa.grapecity.com.cn
+                        </span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>

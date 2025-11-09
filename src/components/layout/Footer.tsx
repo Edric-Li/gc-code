@@ -6,7 +6,7 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="border-t border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+    <footer className="relative z-50 border-t border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
       <div className="container-custom py-12">
         <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
           {/* Brand */}
@@ -23,7 +23,7 @@ export default function Footer() {
             <ul className="space-y-3">
               <li>
                 <Link
-                  to="/docs"
+                  to="/docs/quick-start/installation"
                   className="text-sm text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400"
                 >
                   快速开始
@@ -31,18 +31,18 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  to="/docs"
+                  to="/docs/usage-guidelines"
                   className="text-sm text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400"
                 >
-                  API 参考
+                  使用须知
                 </Link>
               </li>
               <li>
                 <Link
-                  to="/docs"
+                  to="/docs/privacy-policy"
                   className="text-sm text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400"
                 >
-                  部署指南
+                  隐私策略
                 </Link>
               </li>
             </ul>
@@ -53,21 +53,11 @@ export default function Footer() {
             <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">资源</h3>
             <ul className="space-y-3">
               <li>
-                <a
-                  href={siteConfig.links.github}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400"
-                >
-                  GitHub
-                </a>
-              </li>
-              <li>
                 <Link
-                  to="/docs"
+                  to="/usage"
                   className="text-sm text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400"
                 >
-                  常见问题
+                  用量查询
                 </Link>
               </li>
             </ul>

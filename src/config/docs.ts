@@ -16,36 +16,32 @@ export interface DocSection {
 
 export const docsConfig: DocSection[] = [
   {
-    title: '使用须知',
+    title: '快速开始',
+    items: [
+      {
+        title: '安装',
+        href: '/docs/quick-start/installation',
+      },
+      {
+        title: '认证',
+        href: '/docs/quick-start/authentication',
+      },
+      {
+        title: '启动',
+        href: '/docs/quick-start/getting-started',
+      },
+    ],
+  },
+  {
+    title: '指南',
     items: [
       {
         title: '使用须知',
         href: '/docs/usage-guidelines',
       },
-    ],
-  },
-  {
-    title: 'Claude 指南',
-    items: [
       {
-        title: 'Claude 介绍',
-        href: '/docs/claude/introduction',
-      },
-      {
-        title: '环境安装',
-        href: '/docs/claude/installation',
-      },
-      {
-        title: '快速开始',
-        href: '/docs/claude/quick-start',
-      },
-      {
-        title: '高级功能',
-        href: '/docs/claude/advanced',
-      },
-      {
-        title: '常见问题',
-        href: '/docs/claude/faq',
+        title: '隐私策略',
+        href: '/docs/privacy-policy',
       },
     ],
   },

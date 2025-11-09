@@ -42,10 +42,10 @@ export default function Callout({ type = 'info', title, children }: CalloutProps
 
   return (
     <div className={`my-6 flex gap-3 rounded-lg border p-4 ${config.className}`} role="alert">
-      <Icon className={`h-5 w-5 flex-shrink-0 ${config.iconClassName}`} />
-      <div className="flex-1">
+      <Icon className={`h-5 w-5 flex-shrink-0 mt-0.5 ${config.iconClassName}`} />
+      <div className="flex-1 min-w-0">
         {title && <div className="mb-1 font-semibold">{title}</div>}
-        <div className="text-sm leading-relaxed">{children}</div>
+        <div className="text-sm leading-relaxed [&>p]:mb-0">{children}</div>
       </div>
     </div>
   );
