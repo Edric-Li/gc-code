@@ -167,8 +167,6 @@ gc-code-portal/
 
 ## 文档
 
-- [产品文档](./GC_Code_产品文档_v1.0.md)
-- [实施计划](./GC_Code_V1实施计划.md)
 - [代码质量](./CODE_QUALITY.md)
 - [GitHub Actions 使用指南](./.github/WORKFLOW_USAGE.md)
 - [Docker 部署](./docker-compose.yml)
