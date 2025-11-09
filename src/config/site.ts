@@ -1,6 +1,6 @@
 export const siteConfig = {
   name: 'GC Code',
-  description: '支持 Claude、Kimi、GLM 等多种 AI 模型',
+  description: '支持 Claude 等多种 AI 模型',
   url: 'https://gc-code.example.com',
   ogImage: 'https://gc-code.example.com/og.png',
   links: {

@@ -77,10 +77,11 @@ export default function UsageGuidelines() {
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <ProhibitedCard title="压力测试" description="禁止性能基准测试" />
             <ProhibitedCard title="高频并发" description="遵守 3 并发及频率限制" />
             <ProhibitedCard title="商业转售" description="禁止转售或二次分发" />
+            <ProhibitedCard title="非开发活动" description="禁止用于非公司开发任务" />
           </div>
 
           <div className="mt-4 flex items-center gap-2 rounded-lg bg-white/50 px-3 py-2 dark:bg-gray-800/50">

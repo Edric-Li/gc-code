@@ -27,7 +27,7 @@ export default function Home() {
             </p>
 
             <p className="animate-slide-up mt-6 text-base text-gray-500 dark:text-gray-400 sm:text-lg md:text-xl">
-              支持 Claude、Kimi、GLM 等多种 AI 模型
+              支持 Claude 等多种 AI 模型
             </p>
 
             <div className="animate-slide-up mt-14 flex flex-col items-center justify-center gap-5 sm:flex-row">

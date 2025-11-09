@@ -39,24 +39,24 @@ export default function DocumentLayout({ children }: DocumentLayoutProps) {
           fixed top-16 bottom-0 z-30 w-[280px] transform transition-transform
           ${sidebarOpen ? 'left-0 translate-x-0' : 'left-0 -translate-x-full'}
           lg:translate-x-0
-          lg:left-[max(0px,calc((100vw-1536px)/2))]
+          lg:left-[max(0px,calc((100vw-1280px)/2))]
         `}
       />
 
       {/* 主内容区 - 添加左边距为菜单预留空间 */}
-      <div className="mx-auto w-full max-w-screen-2xl lg:pl-[280px]">
+      <div className="mx-auto w-full max-w-7xl lg:pl-[280px]">
         <main className="min-h-screen w-full">
           <div className="px-4 sm:px-6 lg:px-8">
-            <div className="flex gap-8 py-8 lg:gap-12">
+            <div className="py-8">
               {/* 文档内容 */}
-              <article className="doc-content min-w-0 max-w-4xl flex-1">{children}</article>
-
-              {/* 右侧目录 - 仅桌面端显示 */}
-              <TableOfContents className="hidden w-[240px] flex-shrink-0 xl:block" />
+              <article className="doc-content mx-auto min-w-0 max-w-5xl">{children}</article>
             </div>
           </div>
         </main>
       </div>
+
+      {/* 右侧目录 - 固定定位，仅桌面端显示 */}
+      <TableOfContents className="fixed top-16 right-8 hidden w-[240px] xl:block" />
     </div>
   );
 }
