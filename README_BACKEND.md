@@ -207,6 +207,11 @@ npm run format
 
 # 代码检查
 npm run lint
+
+# 数据库管理
+npm run db:init    # 初始化数据库表
+npm run db:reset   # 重置数据库（会删除所有数据！）
+npm run db:shell   # 进入数据库命令行
 ```
 
 ## 技术栈
@@ -230,16 +235,55 @@ npm run lint
 - **路由**: React Router v7
 - **状态管理**: Zustand
 
+## 数据库使用
+
+### 初始化数据库
+
+```bash
+cd backend
+
+# 首次运行：初始化数据库表和默认数据
+npm run db:init
+
+# 重置数据库（删除并重建所有表，会丢失所有数据！）
+npm run db:reset
+
+# 进入数据库命令行
+npm run db:shell
+```
+
+### 默认账号
+
+系统已创建一个默认管理员账号：
+
+- **用户名**: `admin`
+- **密码**: `admin123`
+- **邮箱**: `admin@gccode.cn`
+- **角色**: ADMIN
+
+⚠️ **重要**：生产环境请立即修改默认密码！
+
+### 数据库连接信息
+
+- **Host**: localhost
+- **Port**: 5432
+- **User**: postgres
+- **Password**: xA123456
+- **Database**: gc_code_portal
+- **Docker 容器**: pg-temp
+
+详细的数据库设计和使用说明请查看：[backend/prisma/README.md](./backend/prisma/README.md)
+
 ## 下一步计划
 
 ### 第二阶段功能
 
-1. **数据库集成**
-   - 配置 Prisma
-   - 创建用户表
-   - 数据库迁移
+1. **数据库集成** ✅
+   - ✅ 配置数据库连接
+   - ✅ 创建用户表和 OAuth 账号表
+   - ✅ 数据库初始化脚本
 
-2. **用户认证**
+2. **用户认证** (进行中)
    - JWT 认证
    - 用户名密码登录
    - Azure AD OAuth 登录
