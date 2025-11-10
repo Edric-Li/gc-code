@@ -90,7 +90,7 @@ export default function ApiEndpoints() {
                 API 地址列表
               </h2>
               <p className="text-lg text-gray-600 dark:text-gray-400">
-                如有对应部门请选择部门地址，否则使用通用地址
+                请根据您的部门选择对应的 API 地址
               </p>
             </div>
 
@@ -189,8 +189,9 @@ export default function ApiEndpoints() {
                   <div className="flex-1">
                     <h3 className="font-semibold text-gray-900 dark:text-white mb-3">使用建议</h3>
                     <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                      <p>• 仅使用所在部门或通用地址，勿跨部门使用</p>
-                      <p>• 地址不可用时可切换通用地址</p>
+                      <p>• 如有对应部门请优先使用部门地址</p>
+                      <p>• 请勿跨部门使用其他部门的地址</p>
+                      <p>• 其他情况请使用通用地址</p>
                     </div>
                   </div>
                 </div>

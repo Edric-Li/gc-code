@@ -195,17 +195,17 @@ export default function ClaudeAuthentication() {
         <div className="not-prose my-6">
           <div className="rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800">
             <div className="divide-y divide-gray-100 dark:divide-gray-700">
-              <ApiAddressRow label="通用地址（推荐）" url="https://api.gccode.cn" icon="通" />
               <ApiAddressRow label="DD1 部门" url="https://api.dd1.gccode.cn" icon="D1" />
               <ApiAddressRow label="DD2 部门" url="https://api.dd2.gccode.cn" icon="D2" />
               <ApiAddressRow label="DD3 部门" url="https://api.dd3.gccode.cn" icon="D3" />
               <ApiAddressRow label="Leyser 部门" url="https://api.leyser.gccode.cn" icon="L" />
+              <ApiAddressRow label="通用地址" url="https://api.gccode.cn" icon="通" />
             </div>
           </div>
         </div>
 
-        <Callout type="warning" title="使用建议">
-          仅使用所在部门或通用地址，勿跨部门使用
+        <Callout type="info" title="使用建议">
+          如有对应部门请优先选择部门地址，其他情况请使用通用地址。
         </Callout>
 
         {/* 配置环境变量 */}
