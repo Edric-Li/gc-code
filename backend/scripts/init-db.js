@@ -86,6 +86,30 @@ async function initializeTables() {
         WHEN duplicate_object THEN null;
       END $$;
     `);
+
+    await client.query(`
+      DO $$ BEGIN
+        CREATE TYPE "LoginMethod" AS ENUM ('LOCAL', 'AZURE_AD', 'GOOGLE', 'GITHUB');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `);
+
+    await client.query(`
+      DO $$ BEGIN
+        CREATE TYPE "AuditAction" AS ENUM ('CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT', 'EXPORT', 'IMPORT');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `);
+
+    await client.query(`
+      DO $$ BEGIN
+        CREATE TYPE "HttpMethod" AS ENUM ('GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `);
     console.log('✅ Enum types created');
 
     // 创建用户表
@@ -130,6 +154,64 @@ async function initializeTables() {
     `);
     console.log('✅ OAuth accounts table created');
 
+    // 创建登录日志表
+    console.log('📋 Creating login_logs table...');
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS login_logs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID,
+        email VARCHAR(255) NOT NULL,
+        login_method "LoginMethod" NOT NULL,
+        success BOOLEAN NOT NULL,
+        ip_address VARCHAR(100),
+        user_agent TEXT,
+        error_message TEXT,
+        created_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        CONSTRAINT login_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+      );
+    `);
+    console.log('✅ Login logs table created');
+
+    // 创建操作审计日志表
+    console.log('📋 Creating audit_logs table...');
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL,
+        action "AuditAction" NOT NULL,
+        resource VARCHAR(100) NOT NULL,
+        resource_id VARCHAR(255),
+        description TEXT,
+        changes JSONB,
+        ip_address VARCHAR(100),
+        user_agent TEXT,
+        created_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        CONSTRAINT audit_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+    `);
+    console.log('✅ Audit logs table created');
+
+    // 创建 API 访问日志表
+    console.log('📋 Creating api_logs table...');
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS api_logs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID,
+        method "HttpMethod" NOT NULL,
+        path VARCHAR(500) NOT NULL,
+        status_code INT NOT NULL,
+        duration INT NOT NULL,
+        ip_address VARCHAR(100),
+        user_agent TEXT,
+        request_body JSONB,
+        response_body JSONB,
+        error_message TEXT,
+        created_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        CONSTRAINT api_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+      );
+    `);
+    console.log('✅ API logs table created');
+
     // 创建索引
     console.log('📋 Creating indexes...');
     await client.query(`
@@ -137,6 +219,17 @@ async function initializeTables() {
       CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
       CREATE INDEX IF NOT EXISTS idx_oauth_accounts_user_id ON oauth_accounts(user_id);
       CREATE INDEX IF NOT EXISTS idx_oauth_accounts_provider ON oauth_accounts(provider);
+      CREATE INDEX IF NOT EXISTS idx_login_logs_user_id ON login_logs(user_id);
+      CREATE INDEX IF NOT EXISTS idx_login_logs_created_at ON login_logs(created_at);
+      CREATE INDEX IF NOT EXISTS idx_login_logs_success ON login_logs(success);
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON audit_logs(resource);
+      CREATE INDEX IF NOT EXISTS idx_api_logs_user_id ON api_logs(user_id);
+      CREATE INDEX IF NOT EXISTS idx_api_logs_created_at ON api_logs(created_at);
+      CREATE INDEX IF NOT EXISTS idx_api_logs_path ON api_logs(path);
+      CREATE INDEX IF NOT EXISTS idx_api_logs_status_code ON api_logs(status_code);
     `);
     console.log('✅ Indexes created');
 
@@ -198,8 +291,14 @@ async function initializeTables() {
 
     // 显示统计信息
     const userCount = await client.query('SELECT COUNT(*) FROM users');
+    const loginLogCount = await client.query('SELECT COUNT(*) FROM login_logs');
+    const auditLogCount = await client.query('SELECT COUNT(*) FROM audit_logs');
+    const apiLogCount = await client.query('SELECT COUNT(*) FROM api_logs');
     console.log(`\n📊 Statistics:`);
     console.log(`   Users: ${userCount.rows[0].count}`);
+    console.log(`   Login Logs: ${loginLogCount.rows[0].count}`);
+    console.log(`   Audit Logs: ${auditLogCount.rows[0].count}`);
+    console.log(`   API Logs: ${apiLogCount.rows[0].count}`);
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('\n❌ Error initializing database:', error.message);

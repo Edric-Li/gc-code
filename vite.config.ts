@@ -20,7 +20,7 @@ function securityHeadersPlugin(): Plugin {
             "style-src 'self' 'unsafe-inline'", // Tailwind 需要 unsafe-inline
             "img-src 'self' data: https:",
             "font-src 'self' data:",
-            "connect-src 'self' https://stats.gccode.cn",
+            "connect-src 'self' http://localhost:5555 https://stats.gccode.cn",
             "frame-ancestors 'none'",
             "base-uri 'self'",
             "form-action 'self'",
@@ -51,6 +51,13 @@ export default defineConfig({
   server: {
     port: 3000,
     open: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5555',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
   build: {
     outDir: 'dist',
