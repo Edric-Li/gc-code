@@ -57,6 +57,35 @@ export class UserService {
     return { data, total };
   }
 
+  async getSimpleList(search?: string) {
+    const where: Prisma.UserWhereInput = {
+      isActive: true,
+    };
+
+    if (search) {
+      where.OR = [
+        { email: { contains: search, mode: 'insensitive' } },
+        { username: { contains: search, mode: 'insensitive' } },
+        { displayName: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const users = await this.prisma.user.findMany({
+      where,
+      take: 100,
+      orderBy: { username: 'asc' },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        displayName: true,
+        avatarUrl: true,
+      },
+    });
+
+    return users;
+  }
+
   async findOne(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },

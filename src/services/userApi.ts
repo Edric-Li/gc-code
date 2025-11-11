@@ -38,6 +38,14 @@ export interface UpdateUserData {
   isActive?: boolean;
 }
 
+export interface SimpleUser {
+  id: string;
+  username: string;
+  email: string;
+  displayName?: string;
+  avatarUrl?: string;
+}
+
 export const userApi = {
   getAll: (params: QueryUsersParams = {}) => {
     const query = new URLSearchParams();
@@ -57,4 +65,9 @@ export const userApi = {
   delete: (id: string) => api.delete<{ message: string }>(`/users/${id}`),
 
   getStatistics: () => api.get<UserStatistics>('/users/statistics'),
+
+  getSimpleList: (search?: string) => {
+    const query = search ? `?search=${encodeURIComponent(search)}` : '';
+    return api.get<SimpleUser[]>(`/users/simple-list${query}`);
+  },
 };

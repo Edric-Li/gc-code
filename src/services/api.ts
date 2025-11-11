@@ -42,7 +42,7 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
           .map((e) => (typeof e === 'string' ? e : e.message || ''))
           .join(', ');
       }
-    } catch (parseError) {
+    } catch (_parseError) {
       // 如果无法解析JSON，尝试获取文本
       try {
         const text = await response.text();
@@ -90,6 +90,12 @@ export const api = {
   put: <T>(endpoint: string, data?: unknown) =>
     apiRequest<T>(endpoint, {
       method: 'PUT',
+      body: data ? JSON.stringify(data) : undefined,
+    }),
+
+  patch: <T>(endpoint: string, data?: unknown) =>
+    apiRequest<T>(endpoint, {
+      method: 'PATCH',
       body: data ? JSON.stringify(data) : undefined,
     }),
 

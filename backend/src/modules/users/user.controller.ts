@@ -17,6 +17,11 @@ export class UserController {
     return this.userService.getStatistics();
   }
 
+  @Get('simple-list')
+  getSimpleList(@Query('search') search?: string) {
+    return this.userService.getSimpleList(search);
+  }
+
   @Get()
   findAll(@Query() query: QueryUsersDto) {
     return this.userService.findAll({

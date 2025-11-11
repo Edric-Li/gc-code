@@ -34,7 +34,13 @@ export class AuthService {
     email: string,
     password: string
   ): Promise<Omit<
-    { id: string; email: string; username: string; displayName: string | null },
+    {
+      id: string;
+      email: string;
+      username: string;
+      displayName: string | null;
+      avatarUrl: string | null;
+    },
     'passwordHash'
   > | null> {
     const user = await this.prisma.user.findUnique({
@@ -50,7 +56,7 @@ export class AuthService {
       return null;
     }
 
-    const { passwordHash, ...result } = user;
+    const { passwordHash: _passwordHash, ...result } = user;
     return result;
   }
 
@@ -134,7 +140,7 @@ export class AuthService {
       },
     });
 
-    const { passwordHash, ...result } = user;
+    const { passwordHash: _passwordHash, ...result } = user;
     return result;
   }
 

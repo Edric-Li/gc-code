@@ -50,36 +50,45 @@ enum HttpMethod {
 }
 
 enum OrganizationType {
-  DEPARTMENT    // 部门
+  DEPARTMENT // 部门
   PROJECT_GROUP // 项目组
-  TEAM          // 小组
-  OTHER         // 其他
+  TEAM // 小组
+  OTHER // 其他
 }
 
 enum OrganizationRole {
-  OWNER   // 创建者，拥有所有权限
-  ADMIN   // 管理员，可以管理成员和设置
-  MEMBER  // 普通成员
+  OWNER // 创建者，拥有所有权限
+  ADMIN // 管理员，可以管理成员和设置
+  MEMBER // 普通成员
+}
+
+enum KeyStatus {
+  ACTIVE // 激活中
+  EXPIRED // 已过期
+  REVOKED // 已撤销
+  DELETED // 已删除（软删除）
 }
 
 model User {
-  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  username      String   @unique @db.VarChar(100)
-  email         String   @unique @db.VarChar(255)
-  passwordHash  String?  @map("password_hash") @db.VarChar(255)
-  displayName   String?  @map("display_name") @db.VarChar(255)
-  avatarUrl     String?  @map("avatar_url") @db.VarChar(500)
-  role          Role     @default(USER)
-  isActive      Boolean  @default(true) @map("is_active")
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamp(3)
-  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
-  lastLoginAt   DateTime? @map("last_login_at") @db.Timestamp(3)
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username     String    @unique @db.VarChar(100)
+  email        String    @unique @db.VarChar(255)
+  passwordHash String?   @map("password_hash") @db.VarChar(255)
+  displayName  String?   @map("display_name") @db.VarChar(255)
+  avatarUrl    String?   @map("avatar_url") @db.VarChar(500)
+  role         Role      @default(USER)
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamp(3)
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
+  lastLoginAt  DateTime? @map("last_login_at") @db.Timestamp(3)
 
-  oauthAccounts        OAuthAccount[]
-  loginLogs            LoginLog[]
-  auditLogs            AuditLog[]
-  apiLogs              ApiLog[]
-  organizationMembers  OrganizationMember[]
+  oauthAccounts       OAuthAccount[]
+  loginLogs           LoginLog[]
+  auditLogs           AuditLog[]
+  apiLogs             ApiLog[]
+  organizationMembers OrganizationMember[]
+  apiKeys             ApiKey[]
+  apiKeyUsage         ApiKeyUsage[]
 
   @@index([email], name: "idx_users_email")
   @@index([username], name: "idx_users_username")
@@ -111,15 +120,15 @@ model OAuthAccount {
 
 // 登录日志
 model LoginLog {
-  id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId       String?      @map("user_id") @db.Uuid
-  email        String       @db.VarChar(255)
-  loginMethod  LoginMethod  @map("login_method")
+  id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String?     @map("user_id") @db.Uuid
+  email        String      @db.VarChar(255)
+  loginMethod  LoginMethod @map("login_method")
   success      Boolean
-  ipAddress    String?      @map("ip_address") @db.VarChar(100)
-  userAgent    String?      @map("user_agent") @db.Text
-  errorMessage String?      @map("error_message") @db.Text
-  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamp(3)
+  ipAddress    String?     @map("ip_address") @db.VarChar(100)
+  userAgent    String?     @map("user_agent") @db.Text
+  errorMessage String?     @map("error_message") @db.Text
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamp(3)
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
@@ -131,16 +140,16 @@ model LoginLog {
 
 // 操作审计日志
 model AuditLog {
-  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId      String       @map("user_id") @db.Uuid
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String      @map("user_id") @db.Uuid
   action      AuditAction
-  resource    String       @db.VarChar(100)
-  resourceId  String?      @map("resource_id") @db.VarChar(255)
-  description String?      @db.Text
+  resource    String      @db.VarChar(100)
+  resourceId  String?     @map("resource_id") @db.VarChar(255)
+  description String?     @db.Text
   changes     Json?
-  ipAddress   String?      @map("ip_address") @db.VarChar(100)
-  userAgent   String?      @map("user_agent") @db.Text
-  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamp(3)
+  ipAddress   String?     @map("ip_address") @db.VarChar(100)
+  userAgent   String?     @map("user_agent") @db.Text
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamp(3)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -153,18 +162,18 @@ model AuditLog {
 
 // API 访问日志
 model ApiLog {
-  id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId       String?     @map("user_id") @db.Uuid
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String?    @map("user_id") @db.Uuid
   method       HttpMethod
-  path         String      @db.VarChar(500)
-  statusCode   Int         @map("status_code")
-  duration     Int         // 毫秒
-  ipAddress    String?     @map("ip_address") @db.VarChar(100)
-  userAgent    String?     @map("user_agent") @db.Text
-  requestBody  Json?       @map("request_body")
-  responseBody Json?       @map("response_body")
-  errorMessage String?     @map("error_message") @db.Text
-  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamp(3)
+  path         String     @db.VarChar(500)
+  statusCode   Int        @map("status_code")
+  duration     Int // 毫秒
+  ipAddress    String?    @map("ip_address") @db.VarChar(100)
+  userAgent    String?    @map("user_agent") @db.Text
+  requestBody  Json?      @map("request_body")
+  responseBody Json?      @map("response_body")
+  errorMessage String?    @map("error_message") @db.Text
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamp(3)
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
@@ -177,16 +186,16 @@ model ApiLog {
 
 // 组织（支持树形结构）
 model Organization {
-  id          String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name        String             @db.VarChar(255)
-  slug        String             @unique @db.VarChar(100)  // URL友好的唯一标识
-  type        OrganizationType   @default(DEPARTMENT)      // 组织类型
-  parentId    String?            @map("parent_id") @db.Uuid // 父组织ID
-  description String?            @db.Text
-  avatarUrl   String?            @map("avatar_url") @db.VarChar(500)
-  isActive    Boolean            @default(true) @map("is_active")
-  createdAt   DateTime           @default(now()) @map("created_at") @db.Timestamp(3)
-  updatedAt   DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
+  id          String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String           @db.VarChar(255)
+  slug        String           @unique @db.VarChar(100) // URL友好的唯一标识
+  type        OrganizationType @default(DEPARTMENT) // 组织类型
+  parentId    String?          @map("parent_id") @db.Uuid // 父组织ID
+  description String?          @db.Text
+  avatarUrl   String?          @map("avatar_url") @db.VarChar(500)
+  isActive    Boolean          @default(true) @map("is_active")
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamp(3)
+  updatedAt   DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
 
   // 自引用关系
   parent   Organization?  @relation("OrganizationTree", fields: [parentId], references: [id], onDelete: Cascade)
@@ -216,4 +225,76 @@ model OrganizationMember {
   @@index([organizationId], name: "idx_org_members_org_id")
   @@index([userId], name: "idx_org_members_user_id")
   @@map("organization_members")
+}
+
+// API Key 主表
+model ApiKey {
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+
+  // 基础信息
+  name        String  @db.VarChar(255) // API Key 名称
+  description String? @db.Text // API Key 描述
+  key         String  @unique @db.VarChar(255) // 完整密钥值（明文存储）
+
+  // 费用限制
+  dailyCostLimit Decimal? @map("daily_cost_limit") @db.Decimal(12, 2) // 每日费用限制（null=无限）
+
+  // 时间字段
+  expiresAt  DateTime? @map("expires_at") @db.Timestamp(3) // 过期时间（null=永不过期）
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamp(3) // 最后使用时间
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamp(3)
+  updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamp(3) // 软删除时间
+
+  // 状态和元数据
+  status   KeyStatus @default(ACTIVE)
+  metadata Json? // 其他元数据
+
+  // 关联关系
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  usageRecords ApiKeyUsage[]
+
+  @@index([userId], name: "idx_api_keys_user_id")
+  @@index([key], name: "idx_api_keys_key")
+  @@index([status], name: "idx_api_keys_status")
+  @@index([expiresAt], name: "idx_api_keys_expires_at")
+  @@index([deletedAt], name: "idx_api_keys_deleted_at")
+  @@map("api_keys")
+}
+
+// API Key 用量记录表
+model ApiKeyUsage {
+  id    String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  keyId String @map("key_id") @db.Uuid
+  userId  String @map("user_id") @db.Uuid // 冗余，便于用户级统计
+
+  // 使用统计
+  requestCount Int @default(0) @map("request_count") // 请求次数
+  successCount Int @default(0) @map("success_count") // 成功次数
+  failureCount Int @default(0) @map("failure_count") // 失败次数
+
+  // 费用统计
+  tokensUsed Int     @default(0) @map("tokens_used") // 消耗的Token数量（AI场景）
+  cost       Decimal @default(0) @db.Decimal(12, 4) // 产生的费用
+
+  // 时间字段（按小时或天聚合）
+  periodStart DateTime @map("period_start") @db.Timestamp(3) // 统计周期开始
+  periodEnd   DateTime @map("period_end") @db.Timestamp(3) // 统计周期结束
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(3)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
+
+  // 元数据
+  metadata Json? // 额外统计数据
+
+  // 关联关系
+  apiKey ApiKey @relation(fields: [keyId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([keyId, periodStart]) // 防止重复统计
+  @@index([keyId], name: "idx_api_key_usage_key_id")
+  @@index([userId], name: "idx_api_key_usage_user_id")
+  @@index([periodStart], name: "idx_api_key_usage_period_start")
+  @@index([createdAt], name: "idx_api_key_usage_created_at")
+  @@map("api_key_usage")
 }
