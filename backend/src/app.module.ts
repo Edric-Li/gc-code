@@ -5,6 +5,7 @@ import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { LogModule } from './modules/logs/log.module';
 import { UserModule } from './modules/users/user.module';
+import { OrganizationModule } from './modules/organizations/organization.module';
 
 @Module({
   imports: [
@@ -25,6 +26,9 @@ import { UserModule } from './modules/users/user.module';
 
     // 用户模块
     UserModule,
+
+    // 组织模块
+    OrganizationModule,
 
     // 日志模块
     LogModule,

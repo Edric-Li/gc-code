@@ -16,6 +16,7 @@ const NotFound = lazy(() => import('@/pages/NotFound'));
 // Admin pages
 const Dashboard = lazy(() => import('@/pages/admin/Dashboard'));
 const Users = lazy(() => import('@/pages/admin/Users'));
+const Organizations = lazy(() => import('@/pages/admin/Organizations'));
 const Logs = lazy(() => import('@/pages/admin/Logs'));
 
 function AppRouter() {
@@ -34,6 +35,7 @@ function AppRouter() {
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="users" element={<Users />} />
+          <Route path="organizations" element={<Organizations />} />
           <Route path="logs" element={<Logs />} />
         </Route>
 
