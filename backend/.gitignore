@@ -41,3 +41,14 @@ lerna-debug.log*
 
 # Prisma
 prisma/migrations/*/migration.sql
+# Test files
+*.test.js
+test-*.js
+test-*.sh
+login.json
+test-request.json
+test-*.ts
+
+# Temporary reports
+*_REPORT.md
+*_SUMMARY.md

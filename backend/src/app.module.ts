@@ -9,6 +9,7 @@ import { OrganizationModule } from './modules/organizations/organization.module'
 import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 import { AiProvidersModule } from './modules/ai-providers/ai-providers.module';
 import { ChannelsModule } from './modules/channels/channels.module';
+import { ClaudeRelayModule } from './modules/claude-relay/claude-relay.module';
 
 @Module({
   imports: [
@@ -44,6 +45,9 @@ import { ChannelsModule } from './modules/channels/channels.module';
 
     // Channels 模块
     ChannelsModule,
+
+    // Claude Relay 模块（Sticky Session）
+    ClaudeRelayModule,
   ],
   controllers: [],
   providers: [],
