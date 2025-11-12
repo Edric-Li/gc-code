@@ -4,6 +4,7 @@ import { Channel, ChannelStatus } from '@prisma/client';
 import { SessionHashService } from './session-hash.service';
 import { ISessionStorageService } from './session-storage/session-storage.interface';
 import { SESSION_STORAGE_SERVICE } from '../constants';
+import { ApiKeyInfo, ClaudeMessagesRequest } from '../interfaces/claude-api.interface';
 
 @Injectable()
 export class ClaudeChannelSelectorService {
@@ -18,7 +19,7 @@ export class ClaudeChannelSelectorService {
   /**
    * 为 API Key 选择可用的 Claude 渠道（支持 Sticky Session）
    */
-  async selectChannel(apiKey: any, requestBody: any): Promise<Channel> {
+  async selectChannel(apiKey: ApiKeyInfo, requestBody: ClaudeMessagesRequest): Promise<Channel> {
     // 1. 生成会话哈希
     const sessionHash = this.generateSessionHash(requestBody);
 
@@ -65,7 +66,7 @@ export class ClaudeChannelSelectorService {
   /**
    * 生成会话哈希
    */
-  private generateSessionHash(requestBody: any): string | null {
+  private generateSessionHash(requestBody: ClaudeMessagesRequest): string | null {
     try {
       if (!requestBody?.messages || requestBody.messages.length === 0) {
         return null;
@@ -150,7 +151,7 @@ export class ClaudeChannelSelectorService {
   /**
    * 选择新渠道
    */
-  private async selectNewChannel(apiKey: any): Promise<Channel> {
+  private async selectNewChannel(apiKey: ApiKeyInfo): Promise<Channel> {
     // 1. 如果 API Key 绑定了特定渠道，使用绑定的渠道
     if (apiKey.channelId) {
       const channel = await this.prisma.channel.findFirst({

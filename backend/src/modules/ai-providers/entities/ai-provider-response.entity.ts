@@ -1,6 +1,35 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ProviderType } from '@prisma/client';
 
+export class ProviderModelResponseEntity {
+  @ApiProperty({ description: 'ID' })
+  id: string;
+
+  @ApiProperty({ description: '模型名称' })
+  modelName: string;
+
+  @ApiPropertyOptional({ description: '显示名称' })
+  displayName?: string;
+
+  @ApiPropertyOptional({ description: '模型描述' })
+  description?: string;
+
+  @ApiProperty({ description: '是否启用' })
+  isEnabled: boolean;
+
+  @ApiProperty({ description: '排序' })
+  sortOrder: number;
+
+  @ApiPropertyOptional({ description: '模型元数据' })
+  metadata?: Record<string, unknown>;
+
+  @ApiProperty({ description: '创建时间' })
+  createdAt: Date;
+
+  @ApiProperty({ description: '更新时间' })
+  updatedAt: Date;
+}
+
 export class AiProviderResponseEntity {
   @ApiProperty({ description: 'ID' })
   id: string;
@@ -43,6 +72,9 @@ export class AiProviderResponseEntity {
 
   @ApiPropertyOptional({ description: '渠道数量' })
   channelCount?: number;
+
+  @ApiPropertyOptional({ type: [ProviderModelResponseEntity], description: '支持的模型列表' })
+  models?: ProviderModelResponseEntity[];
 }
 
 export class PaginatedAiProvidersResponse {

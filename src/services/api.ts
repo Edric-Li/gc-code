@@ -75,6 +75,11 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
     throw error;
   }
 
+  // Handle 204 No Content responses (e.g., DELETE requests)
+  if (response.status === 204) {
+    return null as T;
+  }
+
   return response.json();
 }
 

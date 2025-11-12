@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SessionHashService } from './session-hash.service';
+import { ClaudeMessage } from '../interfaces/claude-api.interface';
 
 describe('SessionHashService', () => {
   let service: SessionHashService;
@@ -18,9 +19,9 @@ describe('SessionHashService', () => {
 
   describe('generateHash', () => {
     it('should generate same hash for same messages', () => {
-      const messages = [
-        { role: 'user', content: 'Hello' },
-        { role: 'assistant', content: 'Hi there!' },
+      const messages: ClaudeMessage[] = [
+        { role: 'user' as const, content: 'Hello' },
+        { role: 'assistant' as const, content: 'Hi there!' },
       ];
 
       const hash1 = service.generateHash(messages);
@@ -31,8 +32,8 @@ describe('SessionHashService', () => {
     });
 
     it('should generate different hash for different messages', () => {
-      const messages1 = [{ role: 'user', content: 'Hello' }];
-      const messages2 = [{ role: 'user', content: 'Hi' }];
+      const messages1: ClaudeMessage[] = [{ role: 'user' as const, content: 'Hello' }];
+      const messages2: ClaudeMessage[] = [{ role: 'user' as const, content: 'Hi' }];
 
       const hash1 = service.generateHash(messages1);
       const hash2 = service.generateHash(messages2);

@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import * as crypto from 'crypto';
+import { ClaudeMessage } from '../interfaces/claude-api.interface';
 
 export interface SessionHashOptions {
   messageCount?: number;
@@ -16,7 +17,7 @@ export class SessionHashService {
    * 生成会话哈希
    */
   generateHash(
-    messages: any[],
+    messages: ClaudeMessage[],
     options: SessionHashOptions = {},
   ): string {
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -43,16 +44,15 @@ export class SessionHashService {
    * 提取用于生成哈希的内容
    */
   private extractHashContent(
-    messages: any[],
+    messages: ClaudeMessage[],
     messageCount: number,
     includeSystemPrompt: boolean,
   ): string {
     // 过滤消息
     let filteredMessages = messages;
 
-    if (!includeSystemPrompt) {
-      filteredMessages = messages.filter((msg) => msg.role !== 'system');
-    }
+    // Note: In Claude API, system prompts are passed separately, not as messages
+    // All messages in the array should be either 'user' or 'assistant'
 
     // 取前 N 条消息
     const selectedMessages = filteredMessages.slice(0, messageCount);

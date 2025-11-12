@@ -74,6 +74,7 @@ enum ChannelStatus {
   DISABLED // 已禁用
   ERROR // 出现错误
   MAINTENANCE // 维护中
+  RATE_LIMITED // 限流中
 }
 
 enum ProviderType {
@@ -338,11 +339,33 @@ model AiProvider {
   updatedAt   DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
 
   channels Channel[]
+  models   ProviderModel[]
 
   @@index([slug], name: "idx_ai_providers_slug")
   @@index([type], name: "idx_ai_providers_type")
   @@index([isActive], name: "idx_ai_providers_is_active")
   @@map("ai_providers")
+}
+
+// AI 提供商支持的模型
+model ProviderModel {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  providerId  String   @map("provider_id") @db.Uuid
+  modelName   String   @map("model_name") @db.VarChar(100) // 模型名称，如 "gpt-4"
+  displayName String?  @map("display_name") @db.VarChar(200) // 显示名称，如 "GPT-4 Turbo"
+  description String?  @db.Text // 模型描述
+  isEnabled   Boolean  @default(true) @map("is_enabled") // 是否启用
+  sortOrder   Int      @default(0) @map("sort_order") // 排序
+  metadata    Json? // 模型元数据（价格、上下文长度、能力等）
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(3)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
+
+  provider AiProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, modelName])
+  @@index([providerId], name: "idx_provider_models_provider_id")
+  @@index([modelName], name: "idx_provider_models_model_name")
+  @@map("provider_models")
 }
 
 // 渠道表
@@ -359,13 +382,22 @@ model Channel {
   apiKey  String @map("api_key") @db.Text // API 密钥（需加密存储）
 
   // 状态
-  status ChannelStatus @default(ACTIVE)
+  status   ChannelStatus @default(ACTIVE)
+  isActive Boolean       @default(true) @map("is_active") // 是否启用
+
+  // 负载均衡
+  priority   Int       @default(0) // 优先级，数值越小优先级越高
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamp(3) // 最后使用时间
+
+  // 限流管理
+  rateLimitEndAt DateTime? @map("rate_limit_end_at") @db.Timestamp(3) // 限流结束时间
 
   // 健康检查
   lastHealthCheck DateTime? @map("last_health_check") @db.Timestamp(3)
   healthStatus    String?   @map("health_status") @db.VarChar(50) // healthy, unhealthy
   errorCount      Int       @default(0) @map("error_count") // 连续错误次数
   lastError       String?   @map("last_error") @db.Text // 最后的错误信息
+  lastErrorAt     DateTime? @map("last_error_at") @db.Timestamp(3) // 最后错误时间
 
   // 时间和元数据
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(3)
@@ -381,7 +413,9 @@ model Channel {
 
   @@index([providerId], name: "idx_channels_provider_id")
   @@index([status], name: "idx_channels_status")
+  @@index([isActive], name: "idx_channels_is_active")
   @@index([deletedAt], name: "idx_channels_deleted_at")
+  @@index([lastUsedAt], name: "idx_channels_last_used_at")
   @@map("channels")
 }
 

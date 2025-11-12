@@ -4,6 +4,13 @@ import { Channel } from '@prisma/client';
 import { ClaudeChannelSelectorService } from './claude-channel-selector.service';
 import { firstValueFrom } from 'rxjs';
 import { AxiosResponse } from 'axios';
+import {
+  ApiKeyInfo,
+  ClaudeMessagesRequest,
+  ClaudeMessagesResponse,
+  ClaudeErrorResponse,
+} from '../interfaces/claude-api.interface';
+import { ProxyResponse, StreamProxyResponse } from '../interfaces/proxy.interface';
 
 /**
  * Claude API 请求代理服务
@@ -22,12 +29,12 @@ export class ClaudeProxyService {
    * 转发 Claude API 请求
    */
   async proxyRequest(
-    apiKey: any,
+    apiKey: ApiKeyInfo,
     path: string,
     method: string,
-    requestBody: any,
+    requestBody: ClaudeMessagesRequest,
     headers: Record<string, string>,
-  ): Promise<any> {
+  ): Promise<ProxyResponse> {
     // 1. 选择渠道（支持 Sticky Session）
     const channel = await this.channelSelector.selectChannel(apiKey, requestBody);
 
@@ -61,7 +68,7 @@ export class ClaudeProxyService {
 
       return {
         status: response.status,
-        headers: response.headers,
+        headers: response.headers as Record<string, string | string[]>,
         data: response.data,
       };
     } catch (error) {
@@ -80,12 +87,12 @@ export class ClaudeProxyService {
    * 转发流式请求
    */
   async proxyStreamRequest(
-    apiKey: any,
+    apiKey: ApiKeyInfo,
     path: string,
     method: string,
-    requestBody: any,
+    requestBody: ClaudeMessagesRequest,
     headers: Record<string, string>,
-  ): Promise<{ channel: Channel; stream: any }> {
+  ): Promise<StreamProxyResponse> {
     // 1. 选择渠道
     const channel = await this.channelSelector.selectChannel(apiKey, requestBody);
 
@@ -205,12 +212,18 @@ export class ClaudeProxyService {
   /**
    * 处理渠道错误
    */
-  private async handleChannelError(channel: Channel, error: any) {
-    const status = error.response?.status;
+  private async handleChannelError(channel: Channel, error: unknown) {
+    const axiosError = error as {
+      response?: {
+        status?: number;
+        headers?: Record<string, string>;
+      }
+    };
+    const status = axiosError.response?.status;
 
     // 429: 限流
     if (status === 429) {
-      const resetHeader = error.response?.headers['x-ratelimit-reset'];
+      const resetHeader = axiosError.response?.headers?.['x-ratelimit-reset'];
       const resetTimestamp = resetHeader
         ? parseInt(resetHeader, 10)
         : undefined;

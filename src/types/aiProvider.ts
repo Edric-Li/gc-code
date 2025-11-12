@@ -12,6 +12,27 @@ export enum ProviderType {
   CUSTOM = 'CUSTOM',
 }
 
+export interface ProviderModel {
+  id: string;
+  modelName: string;
+  displayName?: string;
+  description?: string;
+  isEnabled: boolean;
+  sortOrder: number;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProviderModelDto {
+  modelName: string;
+  displayName?: string;
+  description?: string;
+  isEnabled?: boolean;
+  sortOrder?: number;
+  metadata?: Record<string, unknown>;
+}
+
 export interface AiProvider {
   id: string;
   name: string;
@@ -26,6 +47,8 @@ export interface AiProvider {
   metadata?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
+  channelCount?: number;
+  models?: ProviderModel[];
 }
 
 export interface CreateAiProviderDto {
@@ -38,6 +61,7 @@ export interface CreateAiProviderDto {
   isActive?: boolean;
   sortOrder?: number;
   metadata?: Record<string, unknown>;
+  models?: ProviderModelDto[];
 }
 
 export interface UpdateAiProviderDto {
@@ -50,6 +74,7 @@ export interface UpdateAiProviderDto {
   isActive?: boolean;
   sortOrder?: number;
   metadata?: Record<string, unknown>;
+  models?: ProviderModelDto[];
 }
 
 export interface QueryAiProvidersDto {

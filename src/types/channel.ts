@@ -7,6 +7,16 @@ export enum ChannelStatus {
   MAINTENANCE = 'MAINTENANCE',
 }
 
+export interface ChannelModel {
+  id: string;
+  modelName: string;
+  modelKey?: string;
+  isEnabled: boolean;
+  metadata?: Record<string, unknown>;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Channel {
   id: string;
   providerId: string;
@@ -20,7 +30,7 @@ export interface Channel {
   errorCount: number;
   lastError?: string;
   metadata?: Record<string, unknown>;
-  models?: string[];
+  models?: ChannelModel[];
   provider: {
     id: string;
     name: string;
@@ -73,4 +83,5 @@ export interface TestConnectionResponse {
   success: boolean;
   message: string;
   latency?: number;
+  response?: string;
 }

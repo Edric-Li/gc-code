@@ -89,13 +89,19 @@ export default function Channels() {
       const result = await channelApi.testConnection(channelId);
 
       if (result.success) {
-        setSuccess(`连接测试成功 (延迟: ${result.latency}ms)`);
-        setTimeout(() => setSuccess(''), 3000);
+        const responseInfo = result.response
+          ? `\n\nAI 响应: "${result.response}"`
+          : '';
+        alert(
+          `✅ 连接测试成功！\n\n` +
+          `延迟: ${result.latency}ms\n` +
+          `${result.message}` +
+          responseInfo
+        );
+        loadChannels(); // Reload to get updated health status
       } else {
         setError(`连接测试失败: ${result.message}`);
       }
-
-      loadChannels(); // Reload to get updated health status
     } catch (err) {
       setError(err instanceof Error ? err.message : '连接测试失败');
     } finally {

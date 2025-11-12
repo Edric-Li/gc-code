@@ -12,6 +12,10 @@ import {
 import { Request, Response } from 'express';
 import { ClaudeProxyService } from './services/claude-proxy.service';
 import { ApiKeyAuthGuard } from './guards/api-key-auth.guard';
+import {
+  ClaudeMessagesRequest,
+  ApiKeyInfo,
+} from './interfaces/claude-api.interface';
 
 /**
  * Claude API 中继 Controller
@@ -30,9 +34,9 @@ export class ClaudeRelayController {
    */
   @Post('messages')
   async createMessage(
-    @Req() req: Request & { apiKey: any },
+    @Req() req: Request & { apiKey: ApiKeyInfo },
     @Res() res: Response,
-    @Body() body: any,
+    @Body() body: ClaudeMessagesRequest,
     @Headers() headers: Record<string, string>,
   ) {
     const { apiKey } = req;
@@ -75,8 +79,8 @@ export class ClaudeRelayController {
    * 处理普通（非流式）请求
    */
   private async handleNormalRequest(
-    apiKey: any,
-    body: any,
+    apiKey: ApiKeyInfo,
+    body: ClaudeMessagesRequest,
     headers: Record<string, string>,
     res: Response,
   ) {
@@ -103,8 +107,8 @@ export class ClaudeRelayController {
    * 处理流式请求
    */
   private async handleStreamRequest(
-    apiKey: any,
-    body: any,
+    apiKey: ApiKeyInfo,
+    body: ClaudeMessagesRequest,
     headers: Record<string, string>,
     res: Response,
   ) {

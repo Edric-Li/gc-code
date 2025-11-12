@@ -10,8 +10,45 @@ import {
   Min,
   MaxLength,
   Matches,
+  IsArray,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ProviderType } from '@prisma/client';
+
+export class ProviderModelDto {
+  @ApiProperty({ description: '模型名称', example: 'gpt-4' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  modelName: string;
+
+  @ApiPropertyOptional({ description: '显示名称', example: 'GPT-4 Turbo' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  displayName?: string;
+
+  @ApiPropertyOptional({ description: '模型描述' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({ description: '是否启用', default: true })
+  @IsOptional()
+  @IsBoolean()
+  isEnabled?: boolean;
+
+  @ApiPropertyOptional({ description: '排序', default: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+
+  @ApiPropertyOptional({ description: '模型元数据', type: 'object' })
+  @IsOptional()
+  metadata?: Record<string, unknown>;
+}
 
 export class CreateAiProviderDto {
   @ApiProperty({ description: '提供商名称', example: 'OpenAI' })
@@ -71,4 +108,14 @@ export class CreateAiProviderDto {
   @ApiPropertyOptional({ description: '扩展元数据', type: 'object' })
   @IsOptional()
   metadata?: Record<string, unknown>;
+
+  @ApiPropertyOptional({
+    description: '支持的模型列表',
+    type: [ProviderModelDto],
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProviderModelDto)
+  models?: ProviderModelDto[];
 }

@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import type { Channel, UpdateChannelDto, ChannelStatus } from '@/types/channel';
+import type { AiProvider } from '@/types/aiProvider';
+import { aiProviderApi } from '@/services/aiProviderApi';
 
 interface EditChannelDialogProps {
   channel: Channel;
@@ -9,18 +11,39 @@ interface EditChannelDialogProps {
 }
 
 export default function EditChannelDialog({ channel, onClose, onUpdate }: EditChannelDialogProps) {
+  // 将 ChannelModel[] 转换为 string[] 用于编辑
+  const modelNames = channel.models?.map((m) => m.modelName) || [];
+
   const [formData, setFormData] = useState<UpdateChannelDto>({
     name: channel.name,
     description: channel.description || '',
     baseUrl: channel.baseUrl,
     apiKey: '', // Don't pre-fill for security
     status: channel.status,
-    models: channel.models || [],
+    models: modelNames,
   });
+  const [provider, setProvider] = useState<AiProvider | null>(null);
+  const [loadingProvider, setLoadingProvider] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [modelInput, setModelInput] = useState('');
   const [updateApiKey, setUpdateApiKey] = useState(false);
+
+  useEffect(() => {
+    loadProviderDetails();
+  }, []);
+
+  const loadProviderDetails = async () => {
+    try {
+      setLoadingProvider(true);
+      const providerDetails = await aiProviderApi.getById(channel.providerId);
+      setProvider(providerDetails);
+    } catch (err) {
+      console.error('Failed to load provider details:', err);
+    } finally {
+      setLoadingProvider(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,10 +74,12 @@ export default function EditChannelDialog({ channel, onClose, onUpdate }: EditCh
         cleanData.status = formData.status;
       }
 
-      // 比较models数组
-      const currentModels = JSON.stringify(channel.models || []);
-      const newModels = JSON.stringify(formData.models || []);
-      if (newModels !== currentModels) {
+      // 比较models数组（将 ChannelModel[] 转换为 string[] 进行比较）
+      const currentModelNames = channel.models?.map((m) => m.modelName) || [];
+      const newModelNames = formData.models || [];
+      const currentModelsStr = JSON.stringify(currentModelNames.sort());
+      const newModelsStr = JSON.stringify(newModelNames.sort());
+      if (newModelsStr !== currentModelsStr) {
         cleanData.models = formData.models || [];
       }
 
@@ -70,6 +95,15 @@ export default function EditChannelDialog({ channel, onClose, onUpdate }: EditCh
     value: string | number | string[] | ChannelStatus
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const toggleProviderModel = (modelName: string) => {
+    const currentModels = formData.models || [];
+    if (currentModels.includes(modelName)) {
+      handleChange('models', currentModels.filter((m) => m !== modelName));
+    } else {
+      handleChange('models', [...currentModels, modelName]);
+    }
   };
 
   const addModel = () => {
@@ -221,40 +255,134 @@ export default function EditChannelDialog({ channel, onClose, onUpdate }: EditCh
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               支持的模型
             </label>
-            <div className="flex gap-2 mb-2">
-              <input
-                type="text"
-                value={modelInput}
-                onChange={(e) => setModelInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addModel())}
-                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="输入模型名称"
-              />
-              <button
-                type="button"
-                onClick={addModel}
-                className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
-            {formData.models && formData.models.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {formData.models.map((model) => (
-                  <div
-                    key={model}
-                    className="flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-sm"
-                  >
-                    <span>{model}</span>
+
+            {loadingProvider ? (
+              <div className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">
+                加载提供商信息中...
+              </div>
+            ) : provider && provider.models && provider.models.length > 0 ? (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  从提供商预配置的模型中选择：
+                </p>
+                <div className="grid grid-cols-2 gap-3 p-3 border border-gray-200 dark:border-gray-600 rounded-lg">
+                  {provider.models
+                    .filter((m) => m.isEnabled)
+                    .map((model) => (
+                      <div key={model.id} className="flex items-start gap-2">
+                        <input
+                          type="checkbox"
+                          id={`model-${model.id}`}
+                          checked={formData.models?.includes(model.modelName) || false}
+                          onChange={() => toggleProviderModel(model.modelName)}
+                          className="w-4 h-4 mt-0.5 text-blue-600 rounded"
+                        />
+                        <label
+                          htmlFor={`model-${model.id}`}
+                          className="flex-1 cursor-pointer"
+                        >
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            {model.displayName || model.modelName}
+                          </div>
+                          {model.description && (
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {model.description}
+                            </div>
+                          )}
+                        </label>
+                      </div>
+                    ))}
+                </div>
+
+                {/* Manual Input Option */}
+                <div className="pt-3 border-t border-gray-200 dark:border-gray-600">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    或手动添加其他模型：
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={modelInput}
+                      onChange={(e) => setModelInput(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addModel())}
+                      className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                      placeholder="输入模型名称，如 gpt-4-turbo"
+                    />
                     <button
                       type="button"
-                      onClick={() => removeModel(model)}
-                      className="text-gray-500 hover:text-red-600"
+                      onClick={addModel}
+                      className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Plus className="w-4 h-4" />
                     </button>
                   </div>
-                ))}
+                </div>
+
+                {/* Selected Models Display */}
+                {formData.models && formData.models.length > 0 && (
+                  <div className="pt-3 border-t border-gray-200 dark:border-gray-600">
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      已选择的模型：
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.models.map((model) => (
+                        <div
+                          key={model}
+                          className="flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-sm"
+                        >
+                          <span className="text-blue-700 dark:text-blue-300">{model}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeModel(model)}
+                            className="text-blue-600 hover:text-red-600 dark:text-blue-400"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Manual Input Only (No Provider Models) */
+              <div>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={modelInput}
+                    onChange={(e) => setModelInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addModel())}
+                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    placeholder="输入模型名称，如 gpt-4"
+                  />
+                  <button
+                    type="button"
+                    onClick={addModel}
+                    className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+                {formData.models && formData.models.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {formData.models.map((model) => (
+                      <div
+                        key={model}
+                        className="flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-sm"
+                      >
+                        <span>{model}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeModel(model)}
+                          className="text-gray-500 hover:text-red-600"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

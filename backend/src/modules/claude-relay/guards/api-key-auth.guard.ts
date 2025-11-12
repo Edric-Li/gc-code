@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../common/prisma.service';
+import { Request } from 'express';
 
 /**
  * API Key 认证守卫
@@ -41,17 +42,20 @@ export class ApiKeyAuthGuard implements CanActivate {
   /**
    * 从请求头中提取 API Key
    */
-  private extractApiKey(request: any): string | null {
+  private extractApiKey(request: Request): string | null {
     // 支持多种格式
     const xApiKey = request.headers['x-api-key'];
     const authorization = request.headers['authorization'];
 
     if (xApiKey) {
-      return xApiKey;
+      return Array.isArray(xApiKey) ? xApiKey[0] : xApiKey;
     }
 
-    if (authorization?.startsWith('Bearer ')) {
-      return authorization.substring(7);
+    if (authorization) {
+      const authStr = Array.isArray(authorization) ? authorization[0] : authorization;
+      if (authStr.startsWith('Bearer ')) {
+        return authStr.substring(7);
+      }
     }
 
     return null;

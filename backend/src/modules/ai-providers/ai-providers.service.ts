@@ -12,7 +12,7 @@ import {
   AiProviderResponseEntity,
   PaginatedAiProvidersResponse,
 } from './entities/ai-provider-response.entity';
-import { Prisma } from '@prisma/client';
+import { Prisma, ProviderType } from '@prisma/client';
 
 @Injectable()
 export class AiProvidersService {
@@ -31,19 +31,50 @@ export class AiProvidersService {
       throw new ConflictException(`Slug "${dto.slug}" already exists`);
     }
 
-    const provider = await this.prisma.aiProvider.create({
-      data: {
-        name: dto.name,
-        slug: dto.slug,
-        type: dto.type,
-        logoUrl: dto.logoUrl,
-        website: dto.website,
-        description: dto.description,
-        isBuiltIn: false, // 用户创建的提供商不是预置的
-        isActive: dto.isActive ?? true,
-        sortOrder: dto.sortOrder ?? 0,
-        metadata: dto.metadata || Prisma.JsonNull,
-      },
+    // 使用事务创建提供商和模型
+    const provider = await this.prisma.$transaction(async (tx) => {
+      const newProvider = await tx.aiProvider.create({
+        data: {
+          name: dto.name,
+          slug: dto.slug,
+          type: dto.type,
+          logoUrl: dto.logoUrl,
+          website: dto.website,
+          description: dto.description,
+          isBuiltIn: false, // 用户创建的提供商不是预置的
+          isActive: dto.isActive ?? true,
+          sortOrder: dto.sortOrder ?? 0,
+          metadata: (dto.metadata as Prisma.InputJsonValue) || Prisma.JsonNull,
+        },
+        include: {
+          models: true,
+        },
+      });
+
+      // 如果提供了模型列表，创建模型
+      if (dto.models && dto.models.length > 0) {
+        await tx.providerModel.createMany({
+          data: dto.models.map((model, index) => ({
+            providerId: newProvider.id,
+            modelName: model.modelName,
+            displayName: model.displayName,
+            description: model.description,
+            isEnabled: model.isEnabled ?? true,
+            sortOrder: model.sortOrder ?? index,
+            metadata: (model.metadata as Prisma.InputJsonValue) || Prisma.JsonNull,
+          })),
+        });
+
+        // 重新获取包含 models 的 provider
+        return tx.aiProvider.findUnique({
+          where: { id: newProvider.id },
+          include: {
+            models: true,
+          },
+        });
+      }
+
+      return newProvider;
     });
 
     return this.toResponseEntity(provider);
@@ -89,6 +120,9 @@ export class AiProvidersService {
           _count: {
             select: { channels: true },
           },
+          models: {
+            orderBy: [{ sortOrder: 'asc' }, { modelName: 'asc' }],
+          },
         },
       }),
       this.prisma.aiProvider.count({ where }),
@@ -115,6 +149,9 @@ export class AiProvidersService {
       include: {
         _count: {
           select: { channels: true },
+        },
+        models: {
+          orderBy: [{ sortOrder: 'asc' }, { modelName: 'asc' }],
         },
       },
     });
@@ -163,19 +200,60 @@ export class AiProvidersService {
       }
     }
 
-    const provider = await this.prisma.aiProvider.update({
-      where: { id },
-      data: {
-        name: dto.name,
-        slug: dto.slug,
-        type: dto.type,
-        logoUrl: dto.logoUrl,
-        website: dto.website,
-        description: dto.description,
-        isActive: dto.isActive,
-        sortOrder: dto.sortOrder,
-        metadata: dto.metadata !== undefined ? dto.metadata : undefined,
-      },
+    // 使用事务更新提供商和模型
+    const provider = await this.prisma.$transaction(async (tx) => {
+      const updatedProvider = await tx.aiProvider.update({
+        where: { id },
+        data: {
+          name: dto.name,
+          slug: dto.slug,
+          type: dto.type,
+          logoUrl: dto.logoUrl,
+          website: dto.website,
+          description: dto.description,
+          isActive: dto.isActive,
+          sortOrder: dto.sortOrder,
+          metadata: dto.metadata !== undefined ? (dto.metadata as Prisma.InputJsonValue) : undefined,
+        },
+        include: {
+          models: true,
+        },
+      });
+
+      // 如果提供了模型列表，更新模型
+      if (dto.models !== undefined) {
+        // 删除旧的模型
+        await tx.providerModel.deleteMany({
+          where: { providerId: id },
+        });
+
+        // 创建新的模型
+        if (dto.models.length > 0) {
+          await tx.providerModel.createMany({
+            data: dto.models.map((model, index) => ({
+              providerId: id,
+              modelName: model.modelName,
+              displayName: model.displayName,
+              description: model.description,
+              isEnabled: model.isEnabled ?? true,
+              sortOrder: model.sortOrder ?? index,
+              metadata: (model.metadata as Prisma.InputJsonValue) || Prisma.JsonNull,
+            })),
+          });
+        }
+
+        // 重新获取包含 models 的 provider
+        return tx.aiProvider.findUnique({
+          where: { id },
+          include: {
+            models: {
+              orderBy: [{ sortOrder: 'asc' }, { modelName: 'asc' }],
+            },
+          },
+        });
+      }
+
+      return updatedProvider;
     });
 
     return this.toResponseEntity(provider);
@@ -222,7 +300,7 @@ export class AiProvidersService {
     id: string;
     name: string;
     slug: string;
-    type: string;
+    type: ProviderType;
     logoUrl: string | null;
     website: string | null;
     description: string | null;
@@ -232,6 +310,17 @@ export class AiProvidersService {
     metadata: unknown;
     createdAt: Date;
     updatedAt: Date;
+    models?: Array<{
+      id: string;
+      modelName: string;
+      displayName: string | null;
+      description: string | null;
+      isEnabled: boolean;
+      sortOrder: number;
+      metadata: unknown;
+      createdAt: Date;
+      updatedAt: Date;
+    }>;
   }): AiProviderResponseEntity {
     return {
       id: provider.id,
@@ -244,9 +333,20 @@ export class AiProvidersService {
       isBuiltIn: provider.isBuiltIn,
       isActive: provider.isActive,
       sortOrder: provider.sortOrder,
-      metadata: provider.metadata,
+      metadata: provider.metadata as Record<string, unknown> | undefined,
       createdAt: provider.createdAt,
       updatedAt: provider.updatedAt,
+      models: provider.models?.map((model) => ({
+        id: model.id,
+        modelName: model.modelName,
+        displayName: model.displayName,
+        description: model.description,
+        isEnabled: model.isEnabled,
+        sortOrder: model.sortOrder,
+        metadata: model.metadata as Record<string, unknown> | undefined,
+        createdAt: model.createdAt,
+        updatedAt: model.updatedAt,
+      })),
     };
   }
 }
