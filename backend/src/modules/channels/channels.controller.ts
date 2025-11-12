@@ -109,13 +109,19 @@ export class ChannelsController {
       properties: {
         success: { type: 'boolean' },
         message: { type: 'string' },
-        latency: { type: 'number' },
+        latency: { type: 'number', description: '响应时间(ms)' },
+        data: {
+          type: 'object',
+          description: 'API响应数据',
+          nullable: true,
+          additionalProperties: true,
+        },
       },
     },
   })
   async testConnection(
     @Param('id') id: string
-  ): Promise<{ success: boolean; message: string; latency?: number }> {
+  ): Promise<{ success: boolean; message: string; latency?: number; data?: unknown }> {
     return this.channelsService.testConnection(id);
   }
 }

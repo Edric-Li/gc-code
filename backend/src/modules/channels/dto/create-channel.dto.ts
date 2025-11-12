@@ -37,7 +37,7 @@ export class CreateChannelDto {
   @IsUrl({ protocols: ['https'], require_protocol: true })
   @IsNotEmpty()
   @MaxLength(500)
-  @Matches(/^https:\/\/[^/]+[^/]$/, {
+  @Matches(/^https:\/\/.+[^/]$/, {
     message: 'baseUrl必须使用HTTPS协议且不应以斜杠结尾',
   })
   baseUrl: string;

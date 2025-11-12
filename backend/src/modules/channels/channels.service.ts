@@ -10,6 +10,31 @@ import {
 import { Prisma, ChannelStatus } from '@prisma/client';
 import { encryptApiKey, decryptApiKey, maskApiKey } from '../../common/crypto.util';
 
+// 测试连接配置常量
+const TEST_CONNECTION_CONFIG = {
+  // 默认测试模型（可通过环境变量覆盖）
+  DEFAULT_TEST_MODEL: process.env.DEFAULT_TEST_MODEL || 'claude-3-5-haiku-20241022',
+  // 请求超时时间（毫秒）
+  TIMEOUT_MS: parseInt(process.env.TEST_CONNECTION_TIMEOUT || '30000', 10),
+  // Anthropic API 版本
+  ANTHROPIC_VERSION: '2023-06-01',
+} as const;
+
+/**
+ * 解析 HTTP 响应体（尝试 JSON，失败则尝试文本）
+ */
+async function parseResponseBody(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    try {
+      return await response.text();
+    } catch {
+      return null;
+    }
+  }
+}
+
 @Injectable()
 export class ChannelsService {
   constructor(private prisma: PrismaService) {}
@@ -311,32 +336,55 @@ export class ChannelsService {
    */
   async testConnection(
     id: string
-  ): Promise<{ success: boolean; message: string; latency?: number }> {
+  ): Promise<{ success: boolean; message: string; latency?: number; data?: unknown }> {
     const channel = await this.findOne(id, true);
 
     try {
-      const apiKey = decryptApiKey(channel.apiKey);
+      // channel.apiKey 已经在 findOne 方法中被解密了
+      const apiKey = channel.apiKey;
       const startTime = Date.now();
 
-      // 发送测试请求（这里使用通用的 /v1/models 接口）
-      const response = await fetch(`${channel.baseUrl}/v1/models`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        signal: AbortSignal.timeout(30000), // 30秒超时
+      // 系统只支持 Anthropic 原生 API 格式
+      const endpoint = `${channel.baseUrl}/v1/messages`;
+      const headers = {
+        'x-api-key': apiKey,
+        'anthropic-version': TEST_CONNECTION_CONFIG.ANTHROPIC_VERSION,
+        'Content-Type': 'application/json',
+      };
+      const testMessage = {
+        model: TEST_CONNECTION_CONFIG.DEFAULT_TEST_MODEL,
+        messages: [
+          {
+            role: 'user',
+            content: 'Hi, just testing the connection.',
+          },
+        ],
+        max_tokens: 10,
+      };
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(testMessage),
+        signal: AbortSignal.timeout(TEST_CONNECTION_CONFIG.TIMEOUT_MS),
       });
 
       const latency = Date.now() - startTime;
 
       if (!response.ok) {
+        // 尝试获取错误响应内容
+        const errorData = await parseResponseBody(response);
+
         return {
           success: false,
           message: `HTTP ${response.status}: ${response.statusText}`,
           latency,
+          data: errorData,
         };
       }
+
+      // 获取成功响应的数据
+      const responseData = await parseResponseBody(response);
 
       // 更新健康状态
       await this.prisma.channel.update({
@@ -353,6 +401,7 @@ export class ChannelsService {
         success: true,
         message: 'Connection successful',
         latency,
+        data: responseData,
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

@@ -83,5 +83,5 @@ export interface TestConnectionResponse {
   success: boolean;
   message: string;
   latency?: number;
-  response?: string;
+  data?: unknown; // API返回的原始响应数据
 }

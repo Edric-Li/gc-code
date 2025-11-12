@@ -27,6 +27,12 @@ export default function Channels() {
   const [editingChannel, setEditingChannel] = useState<Channel | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Channel | null>(null);
   const [testingChannelId, setTestingChannelId] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{
+    success: boolean;
+    message: string;
+    latency?: number;
+    data?: unknown;
+  } | null>(null);
 
   const loadChannels = useCallback(async () => {
     try {
@@ -89,18 +95,33 @@ export default function Channels() {
       const result = await channelApi.testConnection(channelId);
 
       if (result.success) {
-        const responseInfo = result.response
-          ? `\n\nAI 响应: "${result.response}"`
-          : '';
-        alert(
-          `✅ 连接测试成功！\n\n` +
-          `延迟: ${result.latency}ms\n` +
-          `${result.message}` +
-          responseInfo
-        );
+        setTestResult(result);
         loadChannels(); // Reload to get updated health status
       } else {
-        setError(`连接测试失败: ${result.message}`);
+        // 如果失败，也显示错误响应数据
+        let errorInfo = '';
+        if (result.data) {
+          try {
+            if (typeof result.data === 'object') {
+              // 检查是否有错误消息
+              if (result.data.error) {
+                const errorMsg = result.data.error.message || result.data.error;
+                const errorType = result.data.error.type || '';
+                errorInfo = `\n\n错误详情: ${errorMsg}`;
+                if (errorType) {
+                  errorInfo += ` (类型: ${errorType})`;
+                }
+              } else {
+                errorInfo = `\n\n错误详情:\n${JSON.stringify(result.data, null, 2)}`;
+              }
+            } else {
+              errorInfo = `\n\n错误详情: ${result.data}`;
+            }
+          } catch {
+            errorInfo = '';
+          }
+        }
+        setError(`连接测试失败: ${result.message}${errorInfo}`);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '连接测试失败');
@@ -363,6 +384,167 @@ export default function Channels() {
           onClose={() => setEditingChannel(null)}
           onUpdate={handleUpdateChannel}
         />
+      )}
+
+      {testResult && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div
+              className={`px-6 py-4 border-b ${testResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {testResult.success ? (
+                    <div className="flex-shrink-0 w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                      <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
+                    </div>
+                  ) : (
+                    <div className="flex-shrink-0 w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                      <XCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
+                    </div>
+                  )}
+                  <div>
+                    <h3
+                      className={`text-lg font-semibold ${testResult.success ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'}`}
+                    >
+                      {testResult.success ? '连接测试成功' : '连接测试失败'}
+                    </h3>
+                    <p
+                      className={`text-sm ${testResult.success ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}
+                    >
+                      {testResult.message}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setTestResult(null)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+              {/* Latency */}
+              {testResult.latency !== undefined && (
+                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    响应延迟
+                  </span>
+                  <span
+                    className={`text-sm font-semibold ${testResult.latency < 1000 ? 'text-green-600 dark:text-green-400' : testResult.latency < 3000 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}
+                  >
+                    {testResult.latency}ms
+                  </span>
+                </div>
+              )}
+
+              {/* Response Data */}
+              {testResult.data && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                    API 响应数据
+                  </h4>
+
+                  {/* Anthropic format */}
+                  {testResult.data.content && testResult.data.content[0]?.text && (
+                    <div className="space-y-3">
+                      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                        <div className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
+                          AI 响应
+                        </div>
+                        <div className="text-sm text-blue-800 dark:text-blue-200 font-mono whitespace-pre-wrap">
+                          "{testResult.data.content[0].text}"
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">模型</div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            {testResult.data.model}
+                          </div>
+                        </div>
+                        <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            停止原因
+                          </div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            {testResult.data.stop_reason}
+                          </div>
+                        </div>
+                      </div>
+
+                      {testResult.data.usage && (
+                        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                          <div className="text-sm font-medium text-purple-900 dark:text-purple-100 mb-3">
+                            Token 使用统计
+                          </div>
+                          <div className="grid grid-cols-3 gap-3">
+                            <div className="text-center">
+                              <div className="text-xs text-purple-600 dark:text-purple-400 mb-1">
+                                输入
+                              </div>
+                              <div className="text-lg font-bold text-purple-900 dark:text-purple-100">
+                                {testResult.data.usage.input_tokens}
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-xs text-purple-600 dark:text-purple-400 mb-1">
+                                输出
+                              </div>
+                              <div className="text-lg font-bold text-purple-900 dark:text-purple-100">
+                                {testResult.data.usage.output_tokens}
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-xs text-purple-600 dark:text-purple-400 mb-1">
+                                总计
+                              </div>
+                              <div className="text-lg font-bold text-purple-900 dark:text-purple-100">
+                                {(testResult.data.usage.input_tokens || 0) +
+                                  (testResult.data.usage.output_tokens || 0)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Raw JSON fallback - 当不是 Anthropic 格式时显示原始 JSON */}
+                  {!testResult.data.content && (
+                    <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg overflow-x-auto">
+                      <pre className="text-xs text-gray-700 dark:text-gray-300 font-mono whitespace-pre-wrap">
+                        {JSON.stringify(testResult.data, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+              <button
+                onClick={() => setTestResult(null)}
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {deleteConfirm && (
