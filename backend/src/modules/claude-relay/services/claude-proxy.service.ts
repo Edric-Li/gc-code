@@ -4,13 +4,9 @@ import { Channel } from '@prisma/client';
 import { ClaudeChannelSelectorService } from './claude-channel-selector.service';
 import { firstValueFrom } from 'rxjs';
 import { AxiosResponse } from 'axios';
-import {
-  ApiKeyInfo,
-  ClaudeMessagesRequest,
-  ClaudeMessagesResponse,
-  ClaudeErrorResponse,
-} from '../interfaces/claude-api.interface';
+import { ApiKeyInfo, ClaudeMessagesRequest } from '../interfaces/claude-api.interface';
 import { ProxyResponse, StreamProxyResponse } from '../interfaces/proxy.interface';
+import { decryptApiKey } from '../../../common/crypto.util';
 
 /**
  * Claude API 请求代理服务
@@ -22,7 +18,7 @@ export class ClaudeProxyService {
 
   constructor(
     private httpService: HttpService,
-    private channelSelector: ClaudeChannelSelectorService,
+    private channelSelector: ClaudeChannelSelectorService
   ) {}
 
   /**
@@ -33,14 +29,12 @@ export class ClaudeProxyService {
     path: string,
     method: string,
     requestBody: ClaudeMessagesRequest,
-    headers: Record<string, string>,
+    headers: Record<string, string>
   ): Promise<ProxyResponse> {
     // 1. 选择渠道（支持 Sticky Session）
     const channel = await this.channelSelector.selectChannel(apiKey, requestBody);
 
-    this.logger.log(
-      `Proxying ${method} ${path} via channel: ${channel.name} (${channel.id})`,
-    );
+    this.logger.log(`Proxying ${method} ${path} via channel: ${channel.name} (${channel.id})`);
 
     // 2. 构建目标 URL
     const targetUrl = this.buildTargetUrl(channel, path);
@@ -51,17 +45,10 @@ export class ClaudeProxyService {
     try {
       // 4. 转发请求
       const startTime = Date.now();
-      const response = await this.forwardRequest(
-        method,
-        targetUrl,
-        requestBody,
-        proxyHeaders,
-      );
+      const response = await this.forwardRequest(method, targetUrl, requestBody, proxyHeaders);
       const duration = Date.now() - startTime;
 
-      this.logger.log(
-        `Request completed in ${duration}ms, status: ${response.status}`,
-      );
+      this.logger.log(`Request completed in ${duration}ms, status: ${response.status}`);
 
       // 5. 更新渠道使用时间
       await this.channelSelector.selectChannel(apiKey, requestBody);
@@ -72,9 +59,7 @@ export class ClaudeProxyService {
         data: response.data,
       };
     } catch (error) {
-      this.logger.error(
-        `Request failed via channel ${channel.name}: ${error.message}`,
-      );
+      this.logger.error(`Request failed via channel ${channel.name}: ${error.message}`);
 
       // 处理错误
       await this.handleChannelError(channel, error);
@@ -91,14 +76,12 @@ export class ClaudeProxyService {
     path: string,
     method: string,
     requestBody: ClaudeMessagesRequest,
-    headers: Record<string, string>,
+    headers: Record<string, string>
   ): Promise<StreamProxyResponse> {
     // 1. 选择渠道
     const channel = await this.channelSelector.selectChannel(apiKey, requestBody);
 
-    this.logger.log(
-      `Proxying stream ${method} ${path} via channel: ${channel.name}`,
-    );
+    this.logger.log(`Proxying stream ${method} ${path} via channel: ${channel.name}`);
 
     // 2. 构建目标 URL
     const targetUrl = this.buildTargetUrl(channel, path);
@@ -115,7 +98,7 @@ export class ClaudeProxyService {
           data: requestBody,
           headers: proxyHeaders,
           responseType: 'stream',
-        }),
+        })
       );
 
       return {
@@ -123,9 +106,7 @@ export class ClaudeProxyService {
         stream: response.data,
       };
     } catch (error) {
-      this.logger.error(
-        `Stream request failed via channel ${channel.name}: ${error.message}`,
-      );
+      this.logger.error(`Stream request failed via channel ${channel.name}: ${error.message}`);
 
       await this.handleChannelError(channel, error);
 
@@ -147,19 +128,19 @@ export class ClaudeProxyService {
    */
   private buildProxyHeaders(
     channel: Channel,
-    originalHeaders: Record<string, string>,
+    originalHeaders: Record<string, string>
   ): Record<string, string> {
+    // 解密渠道的 API Key（数据库中是加密存储的）
+    const decryptedApiKey = decryptApiKey(channel.apiKey);
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'anthropic-version': originalHeaders['anthropic-version'] || '2023-06-01',
-      'x-api-key': channel.apiKey, // 使用渠道的 API Key
+      'x-api-key': decryptedApiKey, // 使用解密后的渠道 API Key
     };
 
     // 转发特定的请求头
-    const headersToForward = [
-      'anthropic-beta',
-      'anthropic-dangerous-direct-browser-access',
-    ];
+    const headersToForward = ['anthropic-beta', 'anthropic-dangerous-direct-browser-access'];
 
     headersToForward.forEach((key) => {
       if (originalHeaders[key]) {
@@ -176,8 +157,8 @@ export class ClaudeProxyService {
   private async forwardRequest(
     method: string,
     url: string,
-    data: any,
-    headers: Record<string, string>,
+    data: unknown,
+    headers: Record<string, string>
   ): Promise<AxiosResponse> {
     try {
       return await firstValueFrom(
@@ -187,7 +168,7 @@ export class ClaudeProxyService {
           data,
           headers,
           timeout: 300000, // 5分钟超时
-        }),
+        })
       );
     } catch (error) {
       // 处理 Axios 错误
@@ -196,9 +177,7 @@ export class ClaudeProxyService {
         const status = error.response.status;
         const data = error.response.data;
 
-        this.logger.error(
-          `Channel returned error ${status}: ${JSON.stringify(data)}`,
-        );
+        this.logger.error(`Channel returned error ${status}: ${JSON.stringify(data)}`);
 
         // 抛出包含原始错误信息的异常
         throw new HttpException(data, status);
@@ -217,32 +196,25 @@ export class ClaudeProxyService {
       response?: {
         status?: number;
         headers?: Record<string, string>;
-      }
+      };
     };
     const status = axiosError.response?.status;
 
     // 429: 限流
     if (status === 429) {
       const resetHeader = axiosError.response?.headers?.['x-ratelimit-reset'];
-      const resetTimestamp = resetHeader
-        ? parseInt(resetHeader, 10)
-        : undefined;
+      const resetTimestamp = resetHeader ? parseInt(resetHeader, 10) : undefined;
 
-      await this.channelSelector.markChannelRateLimited(
-        channel.id,
-        resetTimestamp,
-      );
+      await this.channelSelector.markChannelRateLimited(channel.id, resetTimestamp);
 
       this.logger.warn(
-        `Channel ${channel.name} rate limited, reset at: ${resetTimestamp ? new Date(resetTimestamp * 1000) : 'unknown'}`,
+        `Channel ${channel.name} rate limited, reset at: ${resetTimestamp ? new Date(resetTimestamp * 1000) : 'unknown'}`
       );
     }
     // 401, 403: 认证失败
     else if (status === 401 || status === 403) {
       await this.channelSelector.markChannelError(channel.id);
-      this.logger.error(
-        `Channel ${channel.name} authentication failed (${status})`,
-      );
+      this.logger.error(`Channel ${channel.name} authentication failed (${status})`);
     }
     // 500+: 服务器错误
     else if (status >= 500) {

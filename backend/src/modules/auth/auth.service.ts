@@ -19,15 +19,28 @@ export class AuthService {
     private configService: ConfigService,
     private logService: LogService
   ) {
-    // 初始化 Azure MSAL 客户端
-    const msalConfig = {
-      auth: {
-        clientId: this.configService.get<string>('AZURE_CLIENT_ID'),
-        authority: `https://login.microsoftonline.com/${this.configService.get<string>('AZURE_TENANT_ID')}`,
-        clientSecret: this.configService.get<string>('AZURE_CLIENT_SECRET'),
-      },
-    };
-    this.msalClient = new ConfidentialClientApplication(msalConfig);
+    // 只有在配置了有效的 Azure AD 凭据时才初始化 MSAL 客户端
+    const clientId = this.configService.get<string>('AZURE_AD_CLIENT_ID');
+    const tenantId = this.configService.get<string>('AZURE_AD_TENANT_ID');
+    const clientSecret = this.configService.get<string>('AZURE_AD_CLIENT_SECRET');
+
+    if (
+      clientId &&
+      tenantId &&
+      clientSecret &&
+      !clientId.includes('your-') &&
+      !tenantId.includes('your-') &&
+      !clientSecret.includes('your-')
+    ) {
+      const msalConfig = {
+        auth: {
+          clientId,
+          authority: `https://login.microsoftonline.com/${tenantId}`,
+          clientSecret,
+        },
+      };
+      this.msalClient = new ConfidentialClientApplication(msalConfig);
+    }
   }
 
   async validateUser(
@@ -145,7 +158,11 @@ export class AuthService {
   }
 
   async getAzureAuthUrl() {
-    const redirectUri = this.configService.get<string>('AZURE_REDIRECT_URI');
+    if (!this.msalClient) {
+      throw new UnauthorizedException('Azure AD authentication is not configured');
+    }
+
+    const redirectUri = this.configService.get<string>('AZURE_AD_REDIRECT_URI');
 
     const authCodeUrlParameters = {
       scopes: ['user.read'],
@@ -157,7 +174,11 @@ export class AuthService {
   }
 
   async handleAzureCallback(code: string, ipAddress?: string, userAgent?: string) {
-    const redirectUri = this.configService.get<string>('AZURE_REDIRECT_URI');
+    if (!this.msalClient) {
+      throw new UnauthorizedException('Azure AD authentication is not configured');
+    }
+
+    const redirectUri = this.configService.get<string>('AZURE_AD_REDIRECT_URI');
 
     const tokenRequest = {
       code,
