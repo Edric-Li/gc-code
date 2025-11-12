@@ -428,16 +428,16 @@ export class ChannelsService {
       description: channel.description,
       baseUrl: channel.baseUrl,
       apiKey: apiKeyValue,
-      status: channel.status,
+      status: channel.status as ChannelStatus,
       lastHealthCheck: channel.lastHealthCheck,
       healthStatus: channel.healthStatus,
       errorCount: channel.errorCount,
       lastError: channel.lastError,
       createdAt: channel.createdAt,
       updatedAt: channel.updatedAt,
-      metadata: channel.metadata,
+      metadata: channel.metadata as Record<string, unknown> | undefined,
       provider: channel.provider,
-      models: channel.models?.map((m) => m.modelName) || [],
+      models: [],
     };
   }
 }

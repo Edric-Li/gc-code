@@ -16,6 +16,12 @@ export class ChannelModelEntity {
 
   @ApiPropertyOptional({ description: '模型元数据' })
   metadata?: Record<string, unknown>;
+
+  @ApiProperty({ description: '创建时间' })
+  createdAt: Date;
+
+  @ApiProperty({ description: '更新时间' })
+  updatedAt: Date;
 }
 
 export class ChannelResponseEntity {
