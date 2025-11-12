@@ -69,6 +69,25 @@ enum KeyStatus {
   DELETED // 已删除（软删除）
 }
 
+enum ChannelStatus {
+  ACTIVE // 正常使用
+  DISABLED // 已禁用
+  ERROR // 出现错误
+  MAINTENANCE // 维护中
+}
+
+enum ProviderType {
+  OPENAI
+  ANTHROPIC
+  AZURE_OPENAI
+  GOOGLE_AI
+  KIMI
+  DEEPSEEK
+  BAIDU
+  ALIBABA
+  CUSTOM // 自定义
+}
+
 model User {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   username     String    @unique @db.VarChar(100)
@@ -229,8 +248,9 @@ model OrganizationMember {
 
 // API Key 主表
 model ApiKey {
-  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId String @map("user_id") @db.Uuid
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String  @map("user_id") @db.Uuid
+  channelId String? @map("channel_id") @db.Uuid // 关联渠道（null=自动选择）
 
   // 基础信息
   name        String  @db.VarChar(255) // API Key 名称
@@ -252,10 +272,12 @@ model ApiKey {
   metadata Json? // 其他元数据
 
   // 关联关系
-  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel      Channel?      @relation(fields: [channelId], references: [id], onDelete: SetNull)
   usageRecords ApiKeyUsage[]
 
   @@index([userId], name: "idx_api_keys_user_id")
+  @@index([channelId], name: "idx_api_keys_channel_id")
   @@index([key], name: "idx_api_keys_key")
   @@index([status], name: "idx_api_keys_status")
   @@index([expiresAt], name: "idx_api_keys_expires_at")
@@ -265,9 +287,9 @@ model ApiKey {
 
 // API Key 用量记录表
 model ApiKeyUsage {
-  id    String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  keyId String @map("key_id") @db.Uuid
-  userId  String @map("user_id") @db.Uuid // 冗余，便于用户级统计
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  keyId  String @map("key_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid // 冗余，便于用户级统计
 
   // 使用统计
   requestCount Int @default(0) @map("request_count") // 请求次数
@@ -297,4 +319,120 @@ model ApiKeyUsage {
   @@index([periodStart], name: "idx_api_key_usage_period_start")
   @@index([createdAt], name: "idx_api_key_usage_created_at")
   @@map("api_key_usage")
+}
+
+// AI 提供商表
+model AiProvider {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String       @db.VarChar(100) // 提供商名称，如 "OpenAI"
+  slug        String       @unique @db.VarChar(50) // URL友好标识，如 "openai"
+  type        ProviderType @default(CUSTOM) // 提供商类型
+  logoUrl     String?      @map("logo_url") @db.VarChar(500) // Logo 地址
+  website     String?      @db.VarChar(500) // 官网地址
+  description String?      @db.Text // 描述信息
+  isBuiltIn   Boolean      @default(false) @map("is_built_in") // 是否为预置提供商
+  isActive    Boolean      @default(true) @map("is_active") // 是否启用
+  sortOrder   Int          @default(0) @map("sort_order") // 排序
+  metadata    Json? // 扩展元数据（API文档、特性等）
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamp(3)
+  updatedAt   DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
+
+  channels Channel[]
+
+  @@index([slug], name: "idx_ai_providers_slug")
+  @@index([type], name: "idx_ai_providers_type")
+  @@index([isActive], name: "idx_ai_providers_is_active")
+  @@map("ai_providers")
+}
+
+// 渠道表
+model Channel {
+  id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  providerId String @map("provider_id") @db.Uuid // 所属提供商
+
+  // 基础信息
+  name        String  @db.VarChar(255) // 渠道名称，如 "OpenAI 官方"
+  description String? @db.Text // 描述，如 "官方API直连"
+
+  // API 配置
+  baseUrl String @map("base_url") @db.VarChar(500) // API 基础地址
+  apiKey  String @map("api_key") @db.Text // API 密钥（需加密存储）
+
+  // 状态
+  status ChannelStatus @default(ACTIVE)
+
+  // 健康检查
+  lastHealthCheck DateTime? @map("last_health_check") @db.Timestamp(3)
+  healthStatus    String?   @map("health_status") @db.VarChar(50) // healthy, unhealthy
+  errorCount      Int       @default(0) @map("error_count") // 连续错误次数
+  lastError       String?   @map("last_error") @db.Text // 最后的错误信息
+
+  // 时间和元数据
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(3)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamp(3) // 软删除
+  metadata  Json? // 扩展配置（自定义请求头、代理设置、重试策略等）
+
+  // 关联关系
+  provider     AiProvider     @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  models       ChannelModel[]
+  apiKeys      ApiKey[] // 使用该渠道的 API Keys
+  usageRecords ChannelUsage[]
+
+  @@index([providerId], name: "idx_channels_provider_id")
+  @@index([status], name: "idx_channels_status")
+  @@index([deletedAt], name: "idx_channels_deleted_at")
+  @@map("channels")
+}
+
+// 渠道支持的模型
+model ChannelModel {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  channelId String   @map("channel_id") @db.Uuid
+  modelName String   @map("model_name") @db.VarChar(100) // 模型名称，如 "gpt-4"
+  modelKey  String?  @map("model_key") @db.VarChar(100) // 模型映射键（如果渠道使用不同名称）
+  isEnabled Boolean  @default(true) @map("is_enabled") // 是否启用
+  metadata  Json? // 模型配置（价格、上下文长度等）
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(3)
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, modelName])
+  @@index([channelId], name: "idx_channel_models_channel_id")
+  @@index([modelName], name: "idx_channel_models_model_name")
+  @@map("channel_models")
+}
+
+// 渠道使用统计
+model ChannelUsage {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  channelId String @map("channel_id") @db.Uuid
+  apiKeyId  String @map("api_key_id") @db.Uuid // 使用的 API Key
+
+  // 使用统计
+  requestCount Int @default(0) @map("request_count") // 请求次数
+  successCount Int @default(0) @map("success_count") // 成功次数
+  failureCount Int @default(0) @map("failure_count") // 失败次数
+
+  // 性能统计
+  totalLatency Int     @default(0) @map("total_latency") // 总延迟（毫秒）
+  avgLatency   Decimal @default(0) @map("avg_latency") @db.Decimal(10, 2) // 平均延迟
+  tokensUsed   Int     @default(0) @map("tokens_used") // 消耗Token
+  cost         Decimal @default(0) @db.Decimal(12, 4) // 产生费用
+
+  // 时间字段（按小时或天聚合）
+  periodStart DateTime @map("period_start") @db.Timestamp(3)
+  periodEnd   DateTime @map("period_end") @db.Timestamp(3)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(3)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
+
+  metadata Json? // 额外统计数据
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, apiKeyId, periodStart])
+  @@index([channelId], name: "idx_channel_usage_channel_id")
+  @@index([apiKeyId], name: "idx_channel_usage_api_key_id")
+  @@index([periodStart], name: "idx_channel_usage_period_start")
+  @@map("channel_usage")
 }

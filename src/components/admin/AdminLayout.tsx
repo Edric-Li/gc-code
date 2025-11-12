@@ -1,6 +1,17 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { LayoutDashboard, Users, FileText, LogOut, Menu, X, Building2, Key } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Users,
+  FileText,
+  LogOut,
+  Menu,
+  X,
+  Building2,
+  Key,
+  Brain,
+  Network,
+} from 'lucide-react';
 import { useState } from 'react';
 import Logo from '../common/Logo';
 
@@ -9,6 +20,8 @@ const navigation = [
   { name: '用户管理', href: '/admin/users', icon: Users },
   { name: '组织管理', href: '/admin/organizations', icon: Building2 },
   { name: 'API Key', href: '/admin/api-keys', icon: Key },
+  { name: 'AI 提供商', href: '/admin/ai-providers', icon: Brain },
+  { name: '渠道管理', href: '/admin/channels', icon: Network },
   { name: '日志查看', href: '/admin/logs', icon: FileText },
 ];
 

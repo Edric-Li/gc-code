@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import type { CreateApiKeyDto } from '@/types/apiKey';
 import { userApi, type SimpleUser } from '@/services/userApi';
+import { channelApi } from '@/services/channelApi';
+import type { Channel } from '@/types/channel';
 
 interface CreateApiKeyDialogProps {
   onClose: () => void;
@@ -15,14 +17,18 @@ export default function CreateApiKeyDialog({ onClose, onCreate }: CreateApiKeyDi
     expiresAt: '',
     dailyCostLimit: undefined,
     userId: '',
+    channelId: '',
   });
   const [users, setUsers] = useState<SimpleUser[]>([]);
+  const [channels, setChannels] = useState<Channel[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadingChannels, setLoadingChannels] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     loadUsers();
+    loadChannels();
   }, []);
 
   const loadUsers = async () => {
@@ -34,6 +40,18 @@ export default function CreateApiKeyDialog({ onClose, onCreate }: CreateApiKeyDi
       setError('加载用户列表失败');
     } finally {
       setLoadingUsers(false);
+    }
+  };
+
+  const loadChannels = async () => {
+    try {
+      setLoadingChannels(true);
+      const response = await channelApi.list({ status: 'ACTIVE', limit: 100 });
+      setChannels(response.data);
+    } catch (_err) {
+      // Silently fail - channel selection is optional
+    } finally {
+      setLoadingChannels(false);
     }
   };
 
@@ -59,6 +77,10 @@ export default function CreateApiKeyDialog({ onClose, onCreate }: CreateApiKeyDi
 
       if (formData.dailyCostLimit && formData.dailyCostLimit > 0) {
         cleanData.dailyCostLimit = formData.dailyCostLimit;
+      }
+
+      if (formData.channelId) {
+        cleanData.channelId = formData.channelId;
       }
 
       await onCreate(cleanData);
@@ -182,6 +204,29 @@ export default function CreateApiKeyDialog({ onClose, onCreate }: CreateApiKeyDi
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">留空表示无限制</p>
+          </div>
+
+          {/* Channel Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              绑定渠道
+            </label>
+            <select
+              value={formData.channelId}
+              onChange={(e) => handleChange('channelId', e.target.value)}
+              disabled={loadingChannels}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+            >
+              <option value="">自动选择可用渠道</option>
+              {channels.map((channel) => (
+                <option key={channel.id} value={channel.id}>
+                  {channel.name} ({channel.provider.name})
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              留空表示自动从可用渠道中选择，或选择特定渠道进行绑定
+            </p>
           </div>
 
           {/* Actions */}

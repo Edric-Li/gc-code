@@ -1,5 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { KeyStatus } from '@prisma/client';
+import type { User, ApiKey } from '@prisma/client';
+
+/**
+ * API Key 验证结果
+ */
+export interface ValidateKeyResult {
+  user: User;
+  apiKey: ApiKey & { user: User };
+}
 
 export class UsageSummary {
   @ApiProperty({ description: '总请求数' })
@@ -34,6 +43,9 @@ export class ApiKeyResponseEntity {
   @ApiProperty({ description: '用户 ID' })
   userId: string;
 
+  @ApiPropertyOptional({ description: '渠道 ID' })
+  channelId?: string;
+
   @ApiProperty({ description: 'API Key 名称' })
   name: string;
 
@@ -66,6 +78,21 @@ export class ApiKeyResponseEntity {
 
   @ApiPropertyOptional({ description: '使用统计摘要' })
   usageSummary?: UsageSummary;
+
+  @ApiPropertyOptional({
+    description: '关联的渠道信息',
+    type: 'object',
+  })
+  channel?: {
+    id: string;
+    name: string;
+    provider: {
+      id: string;
+      name: string;
+      slug: string;
+      logoUrl?: string;
+    };
+  };
 }
 
 export class PaginatedApiKeysResponse {

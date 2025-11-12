@@ -19,6 +19,8 @@ const Users = lazy(() => import('@/pages/admin/Users'));
 const Organizations = lazy(() => import('@/pages/admin/Organizations'));
 const Logs = lazy(() => import('@/pages/admin/Logs'));
 const ApiKeys = lazy(() => import('@/pages/admin/ApiKeys'));
+const AiProviders = lazy(() => import('@/pages/admin/AiProviders'));
+const Channels = lazy(() => import('@/pages/admin/Channels'));
 
 function AppRouter() {
   return (
@@ -39,6 +41,8 @@ function AppRouter() {
           <Route path="organizations" element={<Organizations />} />
           <Route path="logs" element={<Logs />} />
           <Route path="api-keys" element={<ApiKeys />} />
+          <Route path="ai-providers" element={<AiProviders />} />
+          <Route path="channels" element={<Channels />} />
         </Route>
 
         <Route path="*" element={<NotFound />} />

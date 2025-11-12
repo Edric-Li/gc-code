@@ -7,6 +7,8 @@ import { LogModule } from './modules/logs/log.module';
 import { UserModule } from './modules/users/user.module';
 import { OrganizationModule } from './modules/organizations/organization.module';
 import { ApiKeysModule } from './modules/api-keys/api-keys.module';
+import { AiProvidersModule } from './modules/ai-providers/ai-providers.module';
+import { ChannelsModule } from './modules/channels/channels.module';
 
 @Module({
   imports: [
@@ -36,6 +38,12 @@ import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 
     // API Keys 模块
     ApiKeysModule,
+
+    // AI Providers 模块
+    AiProvidersModule,
+
+    // Channels 模块
+    ChannelsModule,
   ],
   controllers: [],
   providers: [],

@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsNumber,
   IsDateString,
+  IsUUID,
   MaxLength,
   IsPositive,
 } from 'class-validator';
@@ -46,4 +47,12 @@ export class UpdateApiKeyDto {
   @IsOptional()
   @Type(() => Number)
   dailyCostLimit?: number;
+
+  @ApiPropertyOptional({
+    description: '关联的渠道ID，null 表示自动选择可用渠道',
+    example: 'f5f6g7h8-i9j0-k1l2-m3n4-o5p6q7r8s9t0',
+  })
+  @IsUUID()
+  @IsOptional()
+  channelId?: string;
 }

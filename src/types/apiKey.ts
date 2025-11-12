@@ -10,6 +10,7 @@ export enum KeyStatus {
 export interface ApiKey {
   id: string;
   userId: string;
+  channelId?: string;
   name: string;
   description?: string;
   key: string; // 完整 API Key（明文）
@@ -20,6 +21,16 @@ export interface ApiKey {
   createdAt: string;
   updatedAt: string;
   usageSummary?: UsageSummary;
+  channel?: {
+    id: string;
+    name: string;
+    provider: {
+      id: string;
+      name: string;
+      slug: string;
+      logoUrl?: string;
+    };
+  };
 }
 
 export interface UsageSummary {
@@ -47,6 +58,7 @@ export interface CreateApiKeyDto {
   expiresAt?: string;
   dailyCostLimit?: number;
   userId: string; // 管理员创建 API Key 时必须指定用户
+  channelId?: string; // 绑定的渠道ID
 }
 
 export interface UpdateApiKeyDto {
@@ -54,6 +66,7 @@ export interface UpdateApiKeyDto {
   description?: string;
   expiresAt?: string;
   dailyCostLimit?: number;
+  channelId?: string; // 绑定的渠道ID
 }
 
 export interface QueryApiKeysDto {

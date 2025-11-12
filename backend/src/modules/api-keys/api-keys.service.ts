@@ -19,6 +19,7 @@ import {
   ApiKeyUsageResponse,
   ApiKeyStatsOverview,
   ApiKeyRankingResponse,
+  ValidateKeyResult,
 } from './entities/api-key-response.entity';
 import { KeyStatus, Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
@@ -64,10 +65,25 @@ export class ApiKeysService {
     // 转换日期字符串
     const expiresAt = createApiKeyDto.expiresAt ? new Date(createApiKeyDto.expiresAt) : null;
 
+    // 如果指定了channelId，验证渠道是否存在
+    if (createApiKeyDto.channelId) {
+      const channel = await this.prisma.channel.findFirst({
+        where: {
+          id: createApiKeyDto.channelId,
+          deletedAt: null,
+        },
+      });
+
+      if (!channel) {
+        throw new NotFoundException(`Channel with ID ${createApiKeyDto.channelId} not found`);
+      }
+    }
+
     // 创建 API Key 记录
     const apiKey = await this.prisma.apiKey.create({
       data: {
         userId: targetUserId,
+        channelId: createApiKeyDto.channelId || null,
         name: createApiKeyDto.name,
         description: createApiKeyDto.description,
         key,
@@ -139,12 +155,27 @@ export class ApiKeysService {
       skip,
       take: limit,
       orderBy: { createdAt: 'desc' },
+      include: {
+        channel: {
+          include: {
+            provider: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                logoUrl: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     // 转换响应格式
     const data: ApiKeyResponseEntity[] = apiKeys.map((apiKey) => ({
       id: apiKey.id,
       userId: apiKey.userId,
+      channelId: apiKey.channelId,
       name: apiKey.name,
       description: apiKey.description,
       key: apiKey.key,
@@ -153,6 +184,13 @@ export class ApiKeysService {
       expiresAt: apiKey.expiresAt,
       createdAt: apiKey.createdAt,
       updatedAt: apiKey.updatedAt,
+      channel: apiKey.channel
+        ? {
+            id: apiKey.channel.id,
+            name: apiKey.channel.name,
+            provider: apiKey.channel.provider,
+          }
+        : undefined,
     }));
 
     return {
@@ -173,6 +211,20 @@ export class ApiKeysService {
         id,
         userId,
       },
+      include: {
+        channel: {
+          include: {
+            provider: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                logoUrl: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!apiKey) {
@@ -185,6 +237,7 @@ export class ApiKeysService {
     return {
       id: apiKey.id,
       userId: apiKey.userId,
+      channelId: apiKey.channelId,
       name: apiKey.name,
       description: apiKey.description,
       key: apiKey.key,
@@ -193,6 +246,13 @@ export class ApiKeysService {
       lastUsedAt: apiKey.lastUsedAt,
       expiresAt: apiKey.expiresAt,
       createdAt: apiKey.createdAt,
+      channel: apiKey.channel
+        ? {
+            id: apiKey.channel.id,
+            name: apiKey.channel.name,
+            provider: apiKey.channel.provider,
+          }
+        : undefined,
       updatedAt: apiKey.updatedAt,
       usageSummary,
     };
@@ -230,15 +290,51 @@ export class ApiKeysService {
     if (updateApiKeyDto.dailyCostLimit !== undefined) {
       updateData.dailyCostLimit = new Prisma.Decimal(updateApiKeyDto.dailyCostLimit);
     }
+    if (updateApiKeyDto.channelId !== undefined) {
+      // 如果指定了channelId，验证渠道是否存在
+      if (updateApiKeyDto.channelId) {
+        const channel = await this.prisma.channel.findFirst({
+          where: {
+            id: updateApiKeyDto.channelId,
+            deletedAt: null,
+          },
+        });
+
+        if (!channel) {
+          throw new NotFoundException(`Channel with ID ${updateApiKeyDto.channelId} not found`);
+        }
+      }
+      // Use Prisma's relation syntax for updating foreign keys
+      if (updateApiKeyDto.channelId) {
+        updateData.channel = { connect: { id: updateApiKeyDto.channelId } };
+      } else {
+        updateData.channel = { disconnect: true };
+      }
+    }
 
     const updatedApiKey = await this.prisma.apiKey.update({
       where: { id },
       data: updateData,
+      include: {
+        channel: {
+          include: {
+            provider: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                logoUrl: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     return {
       id: updatedApiKey.id,
       userId: updatedApiKey.userId,
+      channelId: updatedApiKey.channelId,
       name: updatedApiKey.name,
       description: updatedApiKey.description,
       key: updatedApiKey.key,
@@ -250,6 +346,13 @@ export class ApiKeysService {
       expiresAt: updatedApiKey.expiresAt,
       createdAt: updatedApiKey.createdAt,
       updatedAt: updatedApiKey.updatedAt,
+      channel: updatedApiKey.channel
+        ? {
+            id: updatedApiKey.channel.id,
+            name: updatedApiKey.channel.name,
+            provider: updatedApiKey.channel.provider,
+          }
+        : undefined,
     };
   }
 
@@ -355,7 +458,7 @@ export class ApiKeysService {
   /**
    * 验证 API Key 有效性
    */
-  async validateKey(key: string): Promise<ApiKeyResponseEntity | null> {
+  async validateKey(key: string): Promise<ValidateKeyResult | null> {
     const apiKey = await this.prisma.apiKey.findUnique({
       where: { key },
       include: { user: true },
