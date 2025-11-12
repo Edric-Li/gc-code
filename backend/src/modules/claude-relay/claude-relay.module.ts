@@ -5,6 +5,7 @@ import { SessionHashService } from './services/session-hash.service';
 import { MemorySessionStorageService } from './services/session-storage/memory-session-storage.service';
 import { ClaudeChannelSelectorService } from './services/claude-channel-selector.service';
 import { ClaudeProxyService } from './services/claude-proxy.service';
+import { UsageTrackingService } from './services/usage-tracking.service';
 import { ClaudeRelayController } from './claude-relay.controller';
 import { ApiKeyAuthGuard } from './guards/api-key-auth.guard';
 import { PrismaService } from '../../common/prisma.service';
@@ -30,6 +31,7 @@ import { SESSION_STORAGE_SERVICE } from './constants';
     },
     ClaudeChannelSelectorService,
     ClaudeProxyService,
+    UsageTrackingService,
     ApiKeyAuthGuard,
   ],
   exports: [

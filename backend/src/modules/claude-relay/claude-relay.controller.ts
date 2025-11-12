@@ -11,10 +11,12 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { ClaudeProxyService } from './services/claude-proxy.service';
+import { UsageTrackingService } from './services/usage-tracking.service';
 import { ApiKeyAuthGuard } from './guards/api-key-auth.guard';
 import {
   ClaudeMessagesRequest,
   ApiKeyInfo,
+  ClaudeMessagesResponse,
 } from './interfaces/claude-api.interface';
 
 /**
@@ -26,7 +28,10 @@ import {
 export class ClaudeRelayController {
   private readonly logger = new Logger(ClaudeRelayController.name);
 
-  constructor(private proxyService: ClaudeProxyService) {}
+  constructor(
+    private proxyService: ClaudeProxyService,
+    private usageTracking: UsageTrackingService
+  ) {}
 
   /**
    * POST /v1/messages
@@ -37,13 +42,11 @@ export class ClaudeRelayController {
     @Req() req: Request & { apiKey: ApiKeyInfo },
     @Res() res: Response,
     @Body() body: ClaudeMessagesRequest,
-    @Headers() headers: Record<string, string>,
+    @Headers() headers: Record<string, string>
   ) {
     const { apiKey } = req;
 
-    this.logger.log(
-      `Received request from API Key: ${apiKey.name} (${apiKey.id})`,
-    );
+    this.logger.log(`Received request from API Key: ${apiKey.name} (${apiKey.id})`);
 
     try {
       // 检查是否是流式请求
@@ -82,14 +85,14 @@ export class ClaudeRelayController {
     apiKey: ApiKeyInfo,
     body: ClaudeMessagesRequest,
     headers: Record<string, string>,
-    res: Response,
+    res: Response
   ) {
     const result = await this.proxyService.proxyRequest(
       apiKey,
       'v1/messages',
       'POST',
       body,
-      headers,
+      headers
     );
 
     // 转发响应头
@@ -98,6 +101,33 @@ export class ClaudeRelayController {
         res.setHeader(key, value as string);
       }
     });
+
+    // 记录用量（异步，不阻塞响应）
+    const success = result.status >= 200 && result.status < 300;
+    if (success && result.data) {
+      const responseData = result.data as ClaudeMessagesResponse;
+      if (responseData.usage) {
+        const cost = this.usageTracking.calculateCost({
+          model: body.model,
+          inputTokens: responseData.usage.input_tokens,
+          outputTokens: responseData.usage.output_tokens,
+        });
+
+        // 异步记录，不等待
+        this.usageTracking
+          .recordUsage({
+            apiKeyId: apiKey.id,
+            userId: apiKey.user.id,
+            inputTokens: responseData.usage.input_tokens,
+            outputTokens: responseData.usage.output_tokens,
+            success: true,
+            cost,
+          })
+          .catch((err) => {
+            this.logger.error(`Failed to record usage: ${err.message}`);
+          });
+      }
+    }
 
     // 返回响应
     return res.status(result.status).json(result.data);
@@ -110,19 +140,17 @@ export class ClaudeRelayController {
     apiKey: ApiKeyInfo,
     body: ClaudeMessagesRequest,
     headers: Record<string, string>,
-    res: Response,
+    res: Response
   ) {
     const { channel, stream } = await this.proxyService.proxyStreamRequest(
       apiKey,
       'v1/messages',
       'POST',
       body,
-      headers,
+      headers
     );
 
-    this.logger.log(
-      `Streaming response via channel: ${channel.name}`,
-    );
+    this.logger.log(`Streaming response via channel: ${channel.name}`);
 
     // 设置流式响应头
     res.setHeader('Content-Type', 'text/event-stream');
