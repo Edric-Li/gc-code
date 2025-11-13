@@ -13,8 +13,8 @@ RUN npm ci --legacy-peer-deps
 # 复制源代码
 COPY . .
 
-# 构建应用
-RUN npm run build
+# 构建前端应用
+RUN npm run build:frontend
 
 # 生产阶段 - 使用 nginx 提供服务
 FROM nginx:alpine
