@@ -36,6 +36,32 @@ export class UsageSummary {
   last30DaysRequests: number;
 }
 
+/**
+ * API Key 列表统计数据（轻量级）
+ */
+export class ApiKeyStatsDto {
+  @ApiProperty({ description: '总请求数' })
+  totalRequests: number;
+
+  @ApiProperty({ description: '成功次数' })
+  successCount: number;
+
+  @ApiProperty({ description: '失败次数' })
+  failureCount: number;
+
+  @ApiProperty({ description: '成功率（百分比）' })
+  successRate: number;
+
+  @ApiProperty({ description: '消耗的 Token 数量' })
+  tokensUsed: number;
+
+  @ApiProperty({ description: '总费用' })
+  totalCost: number;
+
+  @ApiProperty({ description: '最近 30 天费用' })
+  last30DaysCost: number;
+}
+
 export class ApiKeyResponseEntity {
   @ApiProperty({ description: 'API Key ID' })
   id: string;
@@ -78,6 +104,9 @@ export class ApiKeyResponseEntity {
 
   @ApiPropertyOptional({ description: '使用统计摘要' })
   usageSummary?: UsageSummary;
+
+  @ApiPropertyOptional({ description: '列表统计数据', type: ApiKeyStatsDto })
+  stats?: ApiKeyStatsDto;
 
   @ApiPropertyOptional({
     description: '关联的渠道信息',

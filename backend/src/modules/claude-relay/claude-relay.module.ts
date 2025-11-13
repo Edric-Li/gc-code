@@ -14,6 +14,7 @@ import { SESSION_STORAGE_SERVICE } from './constants';
 import { ApiKeyCacheService } from './services/api-key-cache.service';
 import { ChannelPoolCacheService } from './services/channel-pool-cache.service';
 import { UsageQueueService } from './services/usage-queue.service';
+import { PricingService } from './services/pricing.service';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { UsageQueueService } from './services/usage-queue.service';
     ApiKeyCacheService, // API Key 内存缓存
     ChannelPoolCacheService, // 渠道池内存缓存
     UsageQueueService, // 用量统计批量队列
+    PricingService, // 动态定价服务
     ClaudeChannelSelectorService,
     ClaudeProxyService,
     UsageTrackingService,

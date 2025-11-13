@@ -3,9 +3,10 @@ import { ApiKeysController } from './api-keys.controller';
 import { ApiKeysService } from './api-keys.service';
 import { PrismaModule } from '../../common/prisma.module';
 import { AuthModule } from '../auth/auth.module';
+import { ClaudeRelayModule } from '../claude-relay/claude-relay.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule],
+  imports: [PrismaModule, AuthModule, ClaudeRelayModule],
   controllers: [ApiKeysController],
   providers: [ApiKeysService],
   exports: [ApiKeysService],

@@ -3,6 +3,8 @@ import {
   NotFoundException,
   UnauthorizedException,
   BadRequestException,
+  Logger,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { CreateApiKeyDto } from './dto/create-api-key.dto';
@@ -23,10 +25,16 @@ import {
 } from './entities/api-key-response.entity';
 import { KeyStatus, Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
+import { ApiKeyCacheService } from '../claude-relay/services/api-key-cache.service';
 
 @Injectable()
 export class ApiKeysService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(ApiKeysService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    @Optional() private apiKeyCache?: ApiKeyCacheService
+  ) {}
 
   /**
    * 生成随机 API Key
@@ -171,27 +179,78 @@ export class ApiKeysService {
       },
     });
 
+    // 批量查询所有 API Key 的统计数据
+    const apiKeyIds = apiKeys.map((k) => k.id);
+
+    // 查询总统计
+    const usageStats = await this.prisma.apiKeyUsage.groupBy({
+      by: ['keyId'],
+      where: {
+        keyId: { in: apiKeyIds },
+      },
+      _sum: {
+        requestCount: true,
+        successCount: true,
+        failureCount: true,
+        tokensUsed: true,
+        cost: true,
+      },
+    });
+
+    // 查询最近30天统计
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const recent30DaysStats = await this.prisma.apiKeyUsage.groupBy({
+      by: ['keyId'],
+      where: {
+        keyId: { in: apiKeyIds },
+        periodStart: { gte: thirtyDaysAgo },
+      },
+      _sum: {
+        cost: true,
+      },
+    });
+
     // 转换响应格式
-    const data: ApiKeyResponseEntity[] = apiKeys.map((apiKey) => ({
-      id: apiKey.id,
-      userId: apiKey.userId,
-      channelId: apiKey.channelId,
-      name: apiKey.name,
-      description: apiKey.description,
-      key: apiKey.key,
-      status: apiKey.status,
-      dailyCostLimit: apiKey.dailyCostLimit ? parseFloat(apiKey.dailyCostLimit.toString()) : null,
-      expiresAt: apiKey.expiresAt,
-      createdAt: apiKey.createdAt,
-      updatedAt: apiKey.updatedAt,
-      channel: apiKey.channel
-        ? {
-            id: apiKey.channel.id,
-            name: apiKey.channel.name,
-            provider: apiKey.channel.provider,
-          }
-        : undefined,
-    }));
+    const data: ApiKeyResponseEntity[] = apiKeys.map((apiKey) => {
+      const stats = usageStats.find((s) => s.keyId === apiKey.id);
+      const recentStats = recent30DaysStats.find((s) => s.keyId === apiKey.id);
+
+      const totalRequests = stats?._sum.requestCount || 0;
+      const successCount = stats?._sum.successCount || 0;
+
+      return {
+        id: apiKey.id,
+        userId: apiKey.userId,
+        channelId: apiKey.channelId,
+        name: apiKey.name,
+        description: apiKey.description,
+        key: apiKey.key,
+        status: apiKey.status,
+        dailyCostLimit: apiKey.dailyCostLimit ? parseFloat(apiKey.dailyCostLimit.toString()) : null,
+        expiresAt: apiKey.expiresAt,
+        lastUsedAt: apiKey.lastUsedAt,
+        createdAt: apiKey.createdAt,
+        updatedAt: apiKey.updatedAt,
+        channel: apiKey.channel
+          ? {
+              id: apiKey.channel.id,
+              name: apiKey.channel.name,
+              provider: apiKey.channel.provider,
+            }
+          : undefined,
+        stats: {
+          totalRequests,
+          successCount,
+          failureCount: stats?._sum.failureCount || 0,
+          successRate: totalRequests > 0 ? (successCount / totalRequests) * 100 : 0,
+          tokensUsed: stats?._sum.tokensUsed || 0,
+          totalCost: stats?._sum.cost ? parseFloat(stats._sum.cost.toString()) : 0,
+          last30DaysCost: recentStats?._sum.cost ? parseFloat(recentStats._sum.cost.toString()) : 0,
+        },
+      };
+    });
 
     return {
       data,
@@ -331,6 +390,12 @@ export class ApiKeysService {
       },
     });
 
+    // 使更新后的 API Key 缓存失效
+    if (this.apiKeyCache) {
+      this.apiKeyCache.invalidate(updatedApiKey.key);
+      this.logger.debug(`Invalidated cache for updated API Key: ${updatedApiKey.name}`);
+    }
+
     return {
       id: updatedApiKey.id,
       userId: updatedApiKey.userId,
@@ -381,6 +446,12 @@ export class ApiKeysService {
       },
     });
 
+    // 立即使缓存失效（关键安全修复）
+    if (this.apiKeyCache) {
+      this.apiKeyCache.invalidate(apiKey.key);
+      this.logger.log(`Invalidated cache for deleted API Key: ${apiKey.name}`);
+    }
+
     return {
       message: 'API Key deleted successfully',
       id,
@@ -412,6 +483,12 @@ export class ApiKeysService {
         updatedAt: revokedAt,
       },
     });
+
+    // 立即使缓存失效（关键安全修复）
+    if (this.apiKeyCache) {
+      this.apiKeyCache.invalidate(apiKey.key);
+      this.logger.log(`Invalidated cache for revoked API Key: ${apiKey.name}`);
+    }
 
     return {
       message: 'API Key revoked successfully',
@@ -447,6 +524,12 @@ export class ApiKeysService {
         status: KeyStatus.ACTIVE,
       },
     });
+
+    // 使恢复后的 API Key 缓存失效，强制重新加载
+    if (this.apiKeyCache) {
+      this.apiKeyCache.invalidate(apiKey.key);
+      this.logger.log(`Invalidated cache for restored API Key: ${apiKey.name}`);
+    }
 
     return {
       message: 'API Key restored successfully',

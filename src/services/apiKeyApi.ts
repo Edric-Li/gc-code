@@ -15,7 +15,7 @@ export const apiKeyApi = {
   create: (data: CreateApiKeyDto) => api.post<ApiKey>('/api-keys', data),
 
   // 查询 API Key 列表（分页）
-  list: (params: QueryApiKeysDto = {}) => {
+  list: async (params: QueryApiKeysDto = {}) => {
     const queryParams = new URLSearchParams();
     if (params.page) queryParams.append('page', params.page.toString());
     if (params.limit) queryParams.append('limit', params.limit.toString());
@@ -24,7 +24,17 @@ export const apiKeyApi = {
     if (params.includeDeleted) queryParams.append('includeDeleted', 'true');
 
     const query = queryParams.toString();
-    return api.get<PaginatedApiKeysResponse>(`/api-keys${query ? `?${query}` : ''}`);
+    const response = await api.get<PaginatedApiKeysResponse>(
+      `/api-keys${query ? `?${query}` : ''}`
+    );
+
+    // 为每个 API Key 添加 token 字段（用于列表展示）
+    response.data = response.data.map((apiKey) => ({
+      ...apiKey,
+      token: apiKey.key, // 将 key 映射到 token
+    }));
+
+    return response;
   },
 
   // 查询 API Key 详情

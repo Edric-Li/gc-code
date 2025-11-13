@@ -7,6 +7,16 @@ export enum KeyStatus {
   DELETED = 'DELETED',
 }
 
+export interface ApiKeyStats {
+  totalRequests: number;
+  successCount: number;
+  failureCount: number;
+  successRate: number;
+  tokensUsed: number;
+  totalCost: number;
+  last30DaysCost: number;
+}
+
 export interface ApiKey {
   id: string;
   userId: string;
@@ -14,6 +24,7 @@ export interface ApiKey {
   name: string;
   description?: string;
   key: string; // 完整 API Key（明文）
+  token?: string; // 用于列表展示的脱敏 token
   status: KeyStatus;
   dailyCostLimit?: number;
   expiresAt?: string;
@@ -21,6 +32,7 @@ export interface ApiKey {
   createdAt: string;
   updatedAt: string;
   usageSummary?: UsageSummary;
+  stats?: ApiKeyStats;
   channel?: {
     id: string;
     name: string;

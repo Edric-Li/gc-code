@@ -115,10 +115,14 @@ export class ClaudeRelayController {
     if (success && result.data) {
       const responseData = result.data as ClaudeMessagesResponse;
       if (responseData.usage) {
+        // 计算费用 (支持 Prompt Caching)
         const cost = this.usageTracking.calculateCost({
           model: body.model,
           inputTokens: responseData.usage.input_tokens,
           outputTokens: responseData.usage.output_tokens,
+          cacheCreationTokens: responseData.usage.cache_creation_input_tokens,
+          cacheReadTokens: responseData.usage.cache_read_input_tokens,
+          cacheCreation: responseData.usage.cache_creation,
         });
 
         // 异步记录，不等待
@@ -165,12 +169,61 @@ export class ClaudeRelayController {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
-    // 管道流到响应
-    stream.pipe(res);
+    // 用量统计累加器
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    let totalCacheCreationTokens = 0;
+    let totalCacheReadTokens = 0;
+    let cacheCreation:
+      | { ephemeral_5m_input_tokens?: number; ephemeral_1h_input_tokens?: number }
+      | undefined;
+    let isSuccess = true;
+
+    // 拦截流数据以提取usage信息
+    let buffer = '';
+    stream.on('data', (chunk: Buffer) => {
+      const text = chunk.toString();
+      buffer += text;
+
+      // 解析SSE事件
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // 保留最后一个不完整的行
+
+      for (const line of lines) {
+        // 解析 data: {...} 行
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.substring(6));
+
+            // message_start事件包含input tokens (包括缓存)
+            if (data.type === 'message_start' && data.message?.usage) {
+              totalInputTokens = data.message.usage.input_tokens || 0;
+              totalCacheCreationTokens = data.message.usage.cache_creation_input_tokens || 0;
+              totalCacheReadTokens = data.message.usage.cache_read_input_tokens || 0;
+              // Extended Prompt Caching
+              if (data.message.usage.cache_creation) {
+                cacheCreation = data.message.usage.cache_creation;
+              }
+            }
+
+            // message_delta事件包含output tokens
+            if (data.type === 'message_delta' && data.usage) {
+              totalOutputTokens = data.usage.output_tokens || 0;
+            }
+          } catch (e) {
+            // 忽略JSON解析错误
+          }
+        }
+      }
+
+      // 转发数据到客户端
+      res.write(chunk);
+    });
 
     // 处理错误
     stream.on('error', (error: Error) => {
       this.logger.error(`Stream error: ${error.message}`);
+      isSuccess = false;
       if (!res.headersSent) {
         res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
           type: 'error',
@@ -182,9 +235,42 @@ export class ClaudeRelayController {
       }
     });
 
-    // 流结束时记录
+    // 流结束时记录usage
     stream.on('end', () => {
       this.logger.log('Stream completed');
+
+      // 记录用量 (包括缓存)
+      if (isSuccess && (totalInputTokens > 0 || totalOutputTokens > 0)) {
+        const cost = this.usageTracking.calculateCost({
+          model: body.model,
+          inputTokens: totalInputTokens,
+          outputTokens: totalOutputTokens,
+          cacheCreationTokens: totalCacheCreationTokens,
+          cacheReadTokens: totalCacheReadTokens,
+          cacheCreation,
+        });
+
+        this.usageTracking
+          .recordUsage({
+            apiKeyId: apiKey.id,
+            userId: apiKey.user.id,
+            inputTokens: totalInputTokens,
+            outputTokens: totalOutputTokens,
+            success: true,
+            cost,
+          })
+          .catch((err) => {
+            this.logger.error(`Failed to record stream usage: ${err.message}`);
+          });
+
+        this.logger.debug(
+          `Stream usage: ${totalInputTokens} input + ${totalOutputTokens} output + ` +
+            `${totalCacheCreationTokens} cache_write + ${totalCacheReadTokens} cache_read tokens, ` +
+            `cost: $${cost.toFixed(6)}`
+        );
+      }
+
+      res.end();
     });
   }
 

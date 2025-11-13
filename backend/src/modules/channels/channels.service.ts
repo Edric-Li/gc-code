@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+  Optional,
+} from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { CreateChannelDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
@@ -9,6 +15,7 @@ import {
 } from './entities/channel-response.entity';
 import { Prisma, ChannelStatus } from '@prisma/client';
 import { encryptApiKey, decryptApiKey, maskApiKey } from '../../common/crypto.util';
+import { ChannelPoolCacheService } from '../claude-relay/services/channel-pool-cache.service';
 
 // 测试连接配置常量
 const TEST_CONNECTION_CONFIG = {
@@ -37,7 +44,12 @@ async function parseResponseBody(response: Response): Promise<unknown> {
 
 @Injectable()
 export class ChannelsService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(ChannelsService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    @Optional() private channelPoolCache?: ChannelPoolCacheService
+  ) {}
 
   /**
    * 创建渠道
@@ -294,6 +306,16 @@ export class ChannelsService {
       return updatedChannel;
     });
 
+    // 刷新渠道池缓存（异步，不等待）
+    if (this.channelPoolCache) {
+      this.channelPoolCache.refresh().catch((err) => {
+        this.logger.error(`Failed to refresh channel pool cache: ${err.message}`);
+      });
+      this.logger.debug(
+        `Triggered channel pool cache refresh for updated channel: ${channel.name}`
+      );
+    }
+
     return this.toResponseEntity(channel);
   }
 
@@ -329,6 +351,16 @@ export class ChannelsService {
       where: { id },
       data: { deletedAt: new Date() },
     });
+
+    // 刷新渠道池缓存（异步，不等待）
+    if (this.channelPoolCache) {
+      this.channelPoolCache.refresh().catch((err) => {
+        this.logger.error(`Failed to refresh channel pool cache: ${err.message}`);
+      });
+      this.logger.debug(
+        `Triggered channel pool cache refresh for deleted channel: ${existing.name}`
+      );
+    }
   }
 
   /**

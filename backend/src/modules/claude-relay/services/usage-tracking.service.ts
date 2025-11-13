@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../common/prisma.service';
 import { Prisma } from '@prisma/client';
 import { UsageQueueService, UsageRecord } from './usage-queue.service';
+import { PricingService, UsageData } from './pricing.service';
 
 /**
  * API Key 用量追踪服务
@@ -14,7 +15,8 @@ export class UsageTrackingService {
 
   constructor(
     private prisma: PrismaService,
-    private usageQueue: UsageQueueService
+    private usageQueue: UsageQueueService,
+    private pricingService: PricingService
   ) {}
 
   /**
@@ -81,51 +83,58 @@ export class UsageTrackingService {
   }
 
   /**
-   * 计算费用（基于 Claude 定价）
-   * 价格参考：https://www.anthropic.com/pricing
+   * 计算费用（使用动态定价服务）
+   * 支持 Prompt Caching、长上下文定价等高级特性
+   * 价格自动从 LiteLLM 仓库同步
    */
-  calculateCost(params: { model: string; inputTokens: number; outputTokens: number }): number {
-    const { model, inputTokens, outputTokens } = params;
+  calculateCost(params: {
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+    cacheCreationTokens?: number;
+    cacheReadTokens?: number;
+    cacheCreation?: {
+      ephemeral_5m_input_tokens?: number;
+      ephemeral_1h_input_tokens?: number;
+    };
+  }): number {
+    const {
+      model,
+      inputTokens,
+      outputTokens,
+      cacheCreationTokens,
+      cacheReadTokens,
+      cacheCreation,
+    } = params;
 
-    // Claude 3.5 Sonnet (2024-10-22)
-    if (model.includes('claude-3-5-sonnet')) {
-      const inputCost = (inputTokens / 1_000_000) * 3.0; // $3 per MTok
-      const outputCost = (outputTokens / 1_000_000) * 15.0; // $15 per MTok
-      return inputCost + outputCost;
+    // 构建用量数据
+    const usage: UsageData = {
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      cache_creation_input_tokens: cacheCreationTokens,
+      cache_read_input_tokens: cacheReadTokens,
+      cache_creation: cacheCreation,
+    };
+
+    // 使用 PricingService 计算费用
+    const costCalc = this.pricingService.calculateCost(usage, model);
+
+    if (!costCalc.hasPricing) {
+      this.logger.warn(`No pricing data for model: ${model}, cost calculation may be inaccurate`);
     }
 
-    // Claude 3.5 Haiku (2024-10-22)
-    if (model.includes('claude-3-5-haiku')) {
-      const inputCost = (inputTokens / 1_000_000) * 0.8; // $0.8 per MTok
-      const outputCost = (outputTokens / 1_000_000) * 4.0; // $4 per MTok
-      return inputCost + outputCost;
+    // 记录详细费用信息（仅在 debug 模式）
+    if (costCalc.cacheCreateCost > 0 || costCalc.cacheReadCost > 0) {
+      this.logger.debug(
+        `Cost breakdown for ${model}: ` +
+          `input=$${costCalc.inputCost.toFixed(6)}, ` +
+          `output=$${costCalc.outputCost.toFixed(6)}, ` +
+          `cache_write=$${costCalc.cacheCreateCost.toFixed(6)}, ` +
+          `cache_read=$${costCalc.cacheReadCost.toFixed(6)}, ` +
+          `total=$${costCalc.totalCost.toFixed(6)}`
+      );
     }
 
-    // Claude 3 Opus
-    if (model.includes('claude-3-opus')) {
-      const inputCost = (inputTokens / 1_000_000) * 15.0; // $15 per MTok
-      const outputCost = (outputTokens / 1_000_000) * 75.0; // $75 per MTok
-      return inputCost + outputCost;
-    }
-
-    // Claude 3 Sonnet
-    if (model.includes('claude-3-sonnet')) {
-      const inputCost = (inputTokens / 1_000_000) * 3.0; // $3 per MTok
-      const outputCost = (outputTokens / 1_000_000) * 15.0; // $15 per MTok
-      return inputCost + outputCost;
-    }
-
-    // Claude 3 Haiku
-    if (model.includes('claude-3-haiku')) {
-      const inputCost = (inputTokens / 1_000_000) * 0.25; // $0.25 per MTok
-      const outputCost = (outputTokens / 1_000_000) * 1.25; // $1.25 per MTok
-      return inputCost + outputCost;
-    }
-
-    // 默认按 Haiku 计价
-    this.logger.warn(`Unknown model ${model}, using Haiku pricing`);
-    const inputCost = (inputTokens / 1_000_000) * 0.8;
-    const outputCost = (outputTokens / 1_000_000) * 4.0;
-    return inputCost + outputCost;
+    return costCalc.totalCost;
   }
 }

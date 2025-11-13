@@ -46,6 +46,14 @@ export interface ClaudeMessagesResponse {
   usage: {
     input_tokens: number;
     output_tokens: number;
+    // Prompt Caching 支持
+    cache_creation_input_tokens?: number;
+    cache_read_input_tokens?: number;
+    // Extended Prompt Caching (Ephemeral)
+    cache_creation?: {
+      ephemeral_5m_input_tokens?: number;
+      ephemeral_1h_input_tokens?: number;
+    };
   };
 }
 

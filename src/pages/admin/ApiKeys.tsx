@@ -12,6 +12,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { apiKeyApi } from '@/services/apiKeyApi';
+import { formatNumber } from '@/utils/format';
 import type {
   ApiKey,
   KeyStatus,
@@ -147,6 +148,11 @@ export default function ApiKeys() {
     return new Date(date).toLocaleString('zh-CN');
   };
 
+  // 格式化费用：向上取整到2位小数
+  const formatCost = (cost: number) => {
+    return (Math.ceil(cost * 100) / 100).toFixed(2);
+  };
+
   const totalPages = Math.ceil(total / limit);
 
   return (
@@ -223,7 +229,13 @@ export default function ApiKeys() {
                   状态
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  每日费用限制
+                  请求统计
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden md:table-cell">
+                  Token用量
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  费用统计
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   最后使用
@@ -237,7 +249,7 @@ export default function ApiKeys() {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-6 py-8 text-center text-gray-500 dark:text-gray-400"
                   >
                     加载中...
@@ -246,7 +258,7 @@ export default function ApiKeys() {
               ) : apiKeys.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-6 py-8 text-center text-gray-500 dark:text-gray-400"
                   >
                     暂无 API Key
@@ -273,7 +285,7 @@ export default function ApiKeys() {
                           {apiKey.token}
                         </code>
                         <button
-                          onClick={() => copyToClipboard(apiKey.token, apiKey.id)}
+                          onClick={() => copyToClipboard(apiKey.token || '', apiKey.id)}
                           className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
                         >
                           {copiedId === apiKey.id ? (
@@ -285,12 +297,33 @@ export default function ApiKeys() {
                       </div>
                     </td>
                     <td className="px-6 py-4">{getStatusBadge(apiKey.status)}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                      {apiKey.dailyCostLimit ? (
-                        <div>¥{apiKey.dailyCostLimit.toFixed(2)}</div>
-                      ) : (
-                        <span className="text-gray-400">无限制</span>
-                      )}
+                    {/* 请求统计 */}
+                    <td className="px-6 py-4">
+                      <div className="text-sm">
+                        <div className="font-medium text-gray-900 dark:text-white">
+                          {apiKey.stats?.totalRequests.toLocaleString() || 0} 次
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          成功率 {apiKey.stats?.successRate.toFixed(1) || 0}%
+                        </div>
+                      </div>
+                    </td>
+                    {/* Token用量 */}
+                    <td className="px-6 py-4 hidden md:table-cell">
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                        {formatNumber(apiKey.stats?.tokensUsed || 0)}
+                      </div>
+                    </td>
+                    {/* 费用统计 */}
+                    <td className="px-6 py-4">
+                      <div className="text-sm">
+                        <div className="font-medium text-gray-900 dark:text-white">
+                          ¥{formatCost(apiKey.stats?.totalCost || 0)}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          30天: ¥{formatCost(apiKey.stats?.last30DaysCost || 0)}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                       {formatDate(apiKey.lastUsedAt)}
