@@ -53,6 +53,7 @@ export class AuthService {
       username: string;
       displayName: string | null;
       avatarUrl: string | null;
+      role: string;
     },
     'passwordHash'
   > | null> {
@@ -105,7 +106,7 @@ export class AuthService {
       userAgent,
     });
 
-    const payload = { email: user.email, sub: user.id };
+    const payload = { email: user.email, sub: user.id, role: user.role };
     return {
       access_token: this.jwtService.sign(payload),
       user: {
@@ -114,6 +115,7 @@ export class AuthService {
         username: user.username,
         displayName: user.displayName,
         avatar: user.avatarUrl,
+        role: user.role,
       },
     };
   }
@@ -191,6 +193,7 @@ export class AuthService {
       mail?: string;
       userPrincipalName?: string;
       displayName?: string;
+      photoDataUrl?: string;
     } | null = null;
 
     try {
@@ -209,6 +212,30 @@ export class AuthService {
         console.log('Microsoft Graph API response status:', userResponse.status);
         azureUser = userResponse.data;
         console.log('Successfully fetched user info from Microsoft Graph');
+
+        // 尝试获取用户头像
+        try {
+          console.log('Fetching user photo from Microsoft Graph API...');
+          const photoResponse = await axios.get(
+            'https://graph.microsoft.com/v1.0/me/photos/48x48/$value',
+            {
+              headers: {
+                Authorization: `Bearer ${response.accessToken}`,
+              },
+              responseType: 'arraybuffer',
+              timeout: 10000,
+            }
+          );
+
+          // 将图片转换为 base64 data URL
+          const base64Image = Buffer.from(photoResponse.data, 'binary').toString('base64');
+          const contentType = photoResponse.headers['content-type'] || 'image/jpeg';
+          azureUser.photoDataUrl = `data:${contentType};base64,${base64Image}`;
+          console.log('Successfully fetched user photo');
+        } catch (photoError) {
+          // 头像获取失败不影响登录流程
+          console.log('Failed to fetch user photo (non-critical):', photoError.message);
+        }
       } catch (fetchError) {
         console.error('Failed to fetch user info from Microsoft Graph:', fetchError.message);
         if (fetchError.response) {
@@ -287,6 +314,7 @@ export class AuthService {
                 email: azureUser.mail || azureUser.userPrincipalName,
                 username,
                 displayName: azureUser.displayName,
+                avatarUrl: azureUser.photoDataUrl || null,
                 oauthAccounts: {
                   create: {
                     provider: 'AZURE_AD',
@@ -319,10 +347,16 @@ export class AuthService {
         console.log('OAuth account found, updating tokens...');
         user = oauthAccount.user;
 
-        // 更新最后登录时间和 token
-        await this.prisma.user.update({
+        // 更新最后登录时间、头像和 token
+        const updateData: { lastLoginAt: Date; avatarUrl?: string } = { lastLoginAt: new Date() };
+        if (azureUser.photoDataUrl) {
+          updateData.avatarUrl = azureUser.photoDataUrl;
+          console.log('Updating user avatar...');
+        }
+
+        user = await this.prisma.user.update({
           where: { id: user.id },
-          data: { lastLoginAt: new Date() },
+          data: updateData,
         });
 
         await this.prisma.oAuthAccount.update({
@@ -345,7 +379,7 @@ export class AuthService {
       });
 
       // 生成 JWT token
-      const payload = { email: user.email, sub: user.id };
+      const payload = { email: user.email, sub: user.id, role: user.role };
       return {
         access_token: this.jwtService.sign(payload),
         user: {
@@ -354,6 +388,7 @@ export class AuthService {
           username: user.username,
           displayName: user.displayName,
           avatar: user.avatarUrl,
+          role: user.role,
         },
       };
     } catch (error) {

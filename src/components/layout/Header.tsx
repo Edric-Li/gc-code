@@ -1,5 +1,5 @@
-import { Link, useNavigate } from 'react-router-dom';
-import { LogIn, LogOut, User, Shield } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { User, Home, BookOpen, Sparkles, MessageSquare, BarChart3, LucideIcon } from 'lucide-react';
 import Logo from '@/components/common/Logo';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import { navConfig } from '@/config/site';
@@ -7,40 +7,70 @@ import { useAuth } from '@/contexts/AuthContext';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 
 export default function Header() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
+  // 图标映射
+  const iconMap: Record<string, LucideIcon> = {
+    Home,
+    BookOpen,
+    Sparkles,
+    MessageSquare,
+    BarChart3,
   };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/80 backdrop-blur-sm dark:border-gray-800 dark:bg-gray-900/80">
       <div className="container-custom">
         <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
-          <Link to="/" className="hover:opacity-80 transition-opacity">
-            <Logo />
-          </Link>
+          {/* Logo & Theme Toggle */}
+          <div className="flex items-center gap-4">
+            <Link to="/" className="hover:opacity-80 transition-opacity">
+              <Logo />
+            </Link>
+            <ThemeToggle />
+          </div>
 
           {/* Navigation & Actions */}
           <div className="flex items-center gap-4">
-            <nav className="hidden md:flex items-center gap-8">
-              {navConfig.mainNav.map((item) => (
-                <Link
-                  key={item.href}
-                  to={item.href}
-                  className="text-sm font-medium text-gray-700 hover:text-primary-600 dark:text-gray-300 dark:hover:text-primary-400 transition-colors"
-                >
-                  {item.title}
-                </Link>
-              ))}
+            <nav className="hidden md:flex items-center gap-6">
+              {navConfig.mainNav.map((item) => {
+                const Icon = item.icon ? iconMap[item.icon] : null;
+                return (
+                  <Link
+                    key={item.href}
+                    to={item.href}
+                    className="text-sm font-medium text-gray-700 hover:text-primary-600 dark:text-gray-300 dark:hover:text-primary-400 transition-colors flex items-center gap-1.5"
+                  >
+                    {Icon && <Icon className="w-4 h-4" />}
+                    {item.title}
+                  </Link>
+                );
+              })}
+
+              {/* 控制台和管理后台链接 - 已隐藏，可通过下拉菜单或直接URL访问 */}
+              {/* {user && (
+                <>
+                  {user.role === 'ADMIN' && (
+                    <Link
+                      to="/admin"
+                      className="text-sm font-medium text-gray-700 hover:text-primary-600 dark:text-gray-300 dark:hover:text-primary-400 transition-colors flex items-center gap-1.5"
+                    >
+                      <Shield className="w-4 h-4" />
+                      管理后台
+                    </Link>
+                  )}
+                  <Link
+                    to="/console"
+                    className="text-sm font-medium text-gray-700 hover:text-primary-600 dark:text-gray-300 dark:hover:text-primary-400 transition-colors flex items-center gap-1.5"
+                  >
+                    <LayoutDashboard className="w-4 h-4" />
+                    控制台
+                  </Link>
+                </>
+              )} */}
             </nav>
 
-            <ThemeToggle />
-
-            {user ? (
+            {user && (
               <DropdownMenu.Root>
                 <DropdownMenu.Trigger asChild>
                   <button className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
@@ -70,40 +100,9 @@ export default function Header() {
                       <div className="font-medium">{user.displayName || user.username}</div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">{user.email}</div>
                     </DropdownMenu.Item>
-
-                    <DropdownMenu.Separator className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
-
-                    {user.role === 'ADMIN' && (
-                      <>
-                        <DropdownMenu.Item
-                          className="px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer outline-none flex items-center gap-2"
-                          onClick={() => navigate('/admin')}
-                        >
-                          <Shield className="w-4 h-4" />
-                          管理后台
-                        </DropdownMenu.Item>
-                        <DropdownMenu.Separator className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
-                      </>
-                    )}
-
-                    <DropdownMenu.Item
-                      className="px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer outline-none flex items-center gap-2"
-                      onClick={handleLogout}
-                    >
-                      <LogOut className="w-4 h-4" />
-                      退出登录
-                    </DropdownMenu.Item>
                   </DropdownMenu.Content>
                 </DropdownMenu.Portal>
               </DropdownMenu.Root>
-            ) : (
-              <Link
-                to="/login"
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-              >
-                <LogIn className="w-4 h-4" />
-                登录
-              </Link>
             )}
           </div>
         </div>
