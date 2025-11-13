@@ -12,3 +12,16 @@ export function formatNumber(num: number): string {
   }
   return num.toLocaleString();
 }
+
+/**
+ * 格式化货币显示
+ * @param amount 金额（数字或字符串）
+ * @returns 格式化后的货币字符串（如 $1.23, $0.00）
+ */
+export function formatCurrency(amount: number | string): string {
+  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+  if (isNaN(num)) {
+    return '$0.0000';
+  }
+  return `$${num.toFixed(4)}`;
+}

@@ -7,6 +7,7 @@ interface User {
   username?: string;
   displayName?: string;
   avatar?: string;
+  role?: string;
 }
 
 interface AuthContextType {

@@ -1,10 +1,23 @@
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Code2, Sparkles, Bug, Lightbulb, TrendingUp, Clock } from 'lucide-react';
+import {
+  ArrowRight,
+  Code2,
+  Sparkles,
+  Bug,
+  Lightbulb,
+  TrendingUp,
+  Clock,
+  LayoutDashboard,
+  Settings,
+} from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
 import { siteConfig } from '@/config/site';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function Home() {
+  const { user } = useAuth();
+
   const useCases = [
     {
       icon: Code2,
@@ -90,19 +103,40 @@ export default function Home() {
 
             {/* CTA Buttons */}
             <div className="animate-slide-up mt-12 md:mt-16 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <Link
-                to="/docs/quick-start/installation"
-                className="group btn-primary btn-lg w-full sm:w-auto px-8 py-4 text-lg font-medium shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
-              >
-                快速开始
-                <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-              </Link>
-              <Link
-                to="/usage"
-                className="btn-secondary btn-lg w-full sm:w-auto px-8 py-4 text-lg font-medium shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200"
-              >
-                用量查询
-              </Link>
+              {user ? (
+                <>
+                  <Link
+                    to="/console"
+                    className="group btn-primary btn-lg w-full sm:w-auto px-8 py-4 text-lg font-medium shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                  >
+                    <LayoutDashboard className="mr-2 h-5 w-5" />
+                    用户控制台
+                    <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                  <Link
+                    to="/docs/quick-start/installation"
+                    className="btn-secondary btn-lg w-full sm:w-auto px-8 py-4 text-lg font-medium shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200"
+                  >
+                    查看文档
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/docs/quick-start/installation"
+                    className="group btn-primary btn-lg w-full sm:w-auto px-8 py-4 text-lg font-medium shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                  >
+                    快速开始
+                    <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                  <Link
+                    to="/usage"
+                    className="btn-secondary btn-lg w-full sm:w-auto px-8 py-4 text-lg font-medium shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200"
+                  >
+                    用量查询
+                  </Link>
+                </>
+              )}
             </div>
 
             {/* Use Cases Section */}

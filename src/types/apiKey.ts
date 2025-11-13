@@ -92,6 +92,8 @@ export interface QueryApiKeysDto {
 
 export interface ApiKeyStatsOverview {
   totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
   activeTokens: number;
   expiredTokens: number;
   revokedTokens: number;
@@ -103,6 +105,12 @@ export interface ApiKeyStatsOverview {
   avgCostPerRequest: number;
   periodStart: string;
   periodEnd: string;
+  modelDistribution?: Array<{
+    model: string;
+    requests: number;
+    tokens: number;
+    cost: number;
+  }>;
 }
 
 export interface ApiKeyUsageDataPoint {

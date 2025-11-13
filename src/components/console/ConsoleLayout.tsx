@@ -1,32 +1,16 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import {
-  LayoutDashboard,
-  Users,
-  FileText,
-  LogOut,
-  Menu,
-  X,
-  Building2,
-  Key,
-  Brain,
-  Network,
-  Home,
-} from 'lucide-react';
+import { LayoutDashboard, Key, FileText, LogOut, Menu, X, Home } from 'lucide-react';
 import { useState } from 'react';
 import Logo from '../common/Logo';
 
 const navigation = [
-  { name: '仪表板', href: '/admin', icon: LayoutDashboard },
-  { name: '用户管理', href: '/admin/users', icon: Users },
-  { name: '组织管理', href: '/admin/organizations', icon: Building2 },
-  { name: 'API Key', href: '/admin/api-keys', icon: Key },
-  { name: 'AI 提供商', href: '/admin/ai-providers', icon: Brain },
-  { name: '渠道管理', href: '/admin/channels', icon: Network },
-  { name: '日志查看', href: '/admin/logs', icon: FileText },
+  { name: '数据看板', href: '/console', icon: LayoutDashboard },
+  { name: 'API Key 管理', href: '/console/api-keys', icon: Key },
+  { name: '使用日志', href: '/console/logs', icon: FileText },
 ];
 
-export default function AdminLayout() {
+export default function ConsoleLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -73,7 +57,7 @@ export default function AdminLayout() {
               const Icon = item.icon;
               const isActive =
                 location.pathname === item.href ||
-                (item.href !== '/admin' && location.pathname.startsWith(item.href));
+                (item.href !== '/console' && location.pathname.startsWith(item.href));
 
               return (
                 <Link
@@ -97,13 +81,15 @@ export default function AdminLayout() {
           <div className="border-t border-gray-200 dark:border-gray-700 p-4">
             <div className="flex items-center mb-3">
               <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
-                {user.displayName?.charAt(0) || user.email.charAt(0).toUpperCase()}
+                {user?.displayName?.charAt(0) ||
+                  user?.username?.charAt(0) ||
+                  user?.email?.charAt(0).toUpperCase()}
               </div>
               <div className="ml-3 flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                  {user.displayName || user.username}
+                  {user?.displayName || user?.username || '用户'}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email}</p>
               </div>
             </div>
             <button
@@ -128,7 +114,7 @@ export default function AdminLayout() {
             >
               <Menu className="w-6 h-6" />
             </button>
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">管理后台</h1>
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">用户控制台</h1>
           </div>
           <Link
             to="/"

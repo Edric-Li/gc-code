@@ -14,22 +14,27 @@ export const navConfig = {
     {
       title: '首页',
       href: '/',
+      icon: 'Home',
     },
     {
       title: '文档中心',
       href: '/docs',
+      icon: 'BookOpen',
     },
     {
       title: 'MCP 精选',
       href: '/mcp',
+      icon: 'Sparkles',
     },
     {
       title: '经验分享',
       href: '/experience',
+      icon: 'MessageSquare',
     },
     {
       title: '用量查询',
       href: '/usage',
+      icon: 'BarChart3',
     },
   ],
   sidebarNav: [

@@ -120,9 +120,7 @@ export class RequestLogQueueService implements OnModuleInit, OnModuleDestroy {
   async enqueue(record: RequestLogRecord): Promise<void> {
     // 检查缓冲区是否已满
     if (this.buffer.length >= this.MAX_BUFFER_SIZE) {
-      this.logger.warn(
-        `Buffer is full (${this.MAX_BUFFER_SIZE}), triggering async flush`
-      );
+      this.logger.warn(`Buffer is full (${this.MAX_BUFFER_SIZE}), triggering async flush`);
 
       // 异步刷新，不等待（避免阻塞请求）
       this.flush().catch((error) => {
@@ -131,9 +129,7 @@ export class RequestLogQueueService implements OnModuleInit, OnModuleDestroy {
 
       // 如果已经在刷新，则拒绝新记录避免内存溢出
       if (this.isFlushing) {
-        throw new Error(
-          'Request log queue is full and flushing, please try again later'
-        );
+        throw new Error('Request log queue is full and flushing, please try again later');
       }
     }
 
@@ -180,14 +176,9 @@ export class RequestLogQueueService implements OnModuleInit, OnModuleDestroy {
       this.stats.lastFlushTime = new Date();
       this.retryCount = 0; // 重置重试计数
 
-      this.logger.log(
-        `✅ Flushed ${recordsToFlush.length} request log records`
-      );
+      this.logger.log(`✅ Flushed ${recordsToFlush.length} request log records`);
     } catch (error) {
-      this.logger.error(
-        `❌ Failed to flush request log records: ${error.message}`,
-        error.stack
-      );
+      this.logger.error(`❌ Failed to flush request log records: ${error.message}`, error.stack);
 
       // 重试逻辑
       this.retryCount++;
@@ -252,7 +243,7 @@ export class RequestLogQueueService implements OnModuleInit, OnModuleDestroy {
           ipAddress: record.ipAddress,
           userAgent: record.userAgent,
           createdAt: record.timestamp,
-          metadata: record.metadata,
+          metadata: record.metadata as Prisma.InputJsonValue,
         }));
 
         // 使用 createMany 批量插入

@@ -223,6 +223,35 @@ export class ApiKeyStatsOverview {
   @ApiProperty({ description: '平均每次请求费用' })
   avgCostPerRequest: number;
 
+  @ApiProperty({ description: '总 Token 数' })
+  totalTokens: number;
+
+  @ApiProperty({ description: '输入 Token 数' })
+  inputTokens: number;
+
+  @ApiProperty({ description: '输出 Token 数' })
+  outputTokens: number;
+
+  @ApiPropertyOptional({
+    description: '模型使用分布',
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        model: { type: 'string' },
+        requests: { type: 'number' },
+        tokens: { type: 'number' },
+        cost: { type: 'number' },
+      },
+    },
+  })
+  modelDistribution?: Array<{
+    model: string;
+    requests: number;
+    tokens: number;
+    cost: number;
+  }>;
+
   @ApiProperty({ description: '统计周期开始' })
   periodStart: Date;
 
