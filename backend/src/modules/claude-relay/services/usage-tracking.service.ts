@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../common/prisma.service';
-import { Prisma } from '@prisma/client';
 import { UsageQueueService, UsageRecord } from './usage-queue.service';
+import { RequestLogQueueService, RequestLogRecord } from './request-log-queue.service';
 import { PricingService, UsageData } from './pricing.service';
 
 /**
@@ -16,6 +16,7 @@ export class UsageTrackingService {
   constructor(
     private prisma: PrismaService,
     private usageQueue: UsageQueueService,
+    private requestLogQueue: RequestLogQueueService,
     private pricingService: PricingService
   ) {}
 
@@ -61,6 +62,62 @@ export class UsageTrackingService {
     } catch (error) {
       // 记录失败不应该影响主流程
       this.logger.error(`Failed to enqueue usage: ${error.message}`);
+    }
+  }
+
+  /**
+   * 记录详细的请求日志（使用批量队列）
+   * @param params 请求日志参数
+   */
+  async recordRequestLog(params: {
+    apiKeyId: string;
+    userId: string;
+    channelId?: string;
+    requestId: string;
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+    cacheCreationInputTokens?: number;
+    cacheReadInputTokens?: number;
+    duration: number;
+    timeToFirstToken?: number;
+    cost: number;
+    statusCode: number;
+    success: boolean;
+    errorMessage?: string;
+    errorType?: string;
+    ipAddress?: string;
+    userAgent?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<void> {
+    try {
+      // 验证 cost 参数
+      let validatedCost = params.cost;
+      if (!isFinite(validatedCost) || validatedCost < 0) {
+        this.logger.warn(
+          `Invalid cost value: ${params.cost} for request ${params.requestId}, using 0`
+        );
+        validatedCost = 0;
+      }
+
+      // 构建请求日志记录
+      const logRecord: RequestLogRecord = {
+        ...params,
+        cost: validatedCost,
+        timestamp: new Date(),
+      };
+
+      // 入队（异步批量写入，不阻塞）
+      await this.requestLogQueue.enqueue(logRecord);
+
+      this.logger.debug(
+        `Enqueued request log for API Key ${params.apiKeyId.substring(0, 8)}...: ` +
+          `model=${params.model}, tokens=${params.inputTokens + params.outputTokens}, ` +
+          `duration=${params.duration}ms, success=${params.success}`
+      );
+    } catch (error) {
+      // 记录失败不应该影响主流程
+      this.logger.error(`Failed to enqueue request log: ${error.message}`);
     }
   }
 

@@ -846,4 +846,205 @@ export class ApiKeysService {
       data: topRanking,
     };
   }
+
+  /**
+   * 获取 API Key 的详细请求日志
+   */
+  async getRequestLogs(
+    keyId: string,
+    userId: string,
+    query: {
+      page: number;
+      limit: number;
+      startDate?: Date;
+      endDate?: Date;
+      success?: boolean;
+    }
+  ) {
+    // 1. 验证权限
+    const apiKey = await this.prisma.apiKey.findFirst({
+      where: {
+        id: keyId,
+        userId,
+        deletedAt: null,
+      },
+    });
+
+    if (!apiKey) {
+      throw new NotFoundException('API Key 不存在');
+    }
+
+    // 2. 构建查询条件
+    const where: {
+      apiKeyId: string;
+      createdAt?: { gte?: Date; lte?: Date };
+      success?: boolean;
+    } = {
+      apiKeyId: keyId,
+    };
+
+    if (query.startDate) {
+      where.createdAt = { ...where.createdAt, gte: query.startDate };
+    }
+
+    if (query.endDate) {
+      where.createdAt = { ...where.createdAt, lte: query.endDate };
+    }
+
+    if (query.success !== undefined) {
+      where.success = query.success;
+    }
+
+    // 3. 查询总数
+    const total = await this.prisma.apiKeyRequestLog.count({ where });
+
+    // 4. 查询列表
+    const logs = await this.prisma.apiKeyRequestLog.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (query.page - 1) * query.limit,
+      take: query.limit,
+      select: {
+        id: true,
+        requestId: true,
+        model: true,
+        inputTokens: true,
+        outputTokens: true,
+        cacheCreationInputTokens: true,
+        cacheReadInputTokens: true,
+        duration: true,
+        timeToFirstToken: true,
+        cost: true,
+        statusCode: true,
+        success: true,
+        errorMessage: true,
+        errorType: true,
+        ipAddress: true,
+        userAgent: true,
+        channelId: true,
+        createdAt: true,
+        metadata: true,
+        channel: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    return {
+      data: logs,
+      total,
+      page: query.page,
+      limit: query.limit,
+      pages: Math.ceil(total / query.limit),
+    };
+  }
+
+  /**
+   * 获取所有 API Key 的详细请求日志
+   */
+  async getAllRequestLogs(
+    userId: string,
+    query: {
+      page: number;
+      limit: number;
+      apiKeyId?: string;
+      startDate?: Date;
+      endDate?: Date;
+      success?: boolean;
+    }
+  ) {
+    // 1. 构建查询条件 - 只查询当前用户的 API Keys
+    const where: {
+      userId: string;
+      apiKeyId?: string;
+      createdAt?: { gte?: Date; lte?: Date };
+      success?: boolean;
+    } = {
+      userId, // 确保只查询当前用户的数据
+    };
+
+    // 按 API Key 筛选
+    if (query.apiKeyId) {
+      where.apiKeyId = query.apiKeyId;
+    }
+
+    // 按时间筛选
+    if (query.startDate || query.endDate) {
+      where.createdAt = {};
+      if (query.startDate) {
+        where.createdAt.gte = query.startDate;
+      }
+      if (query.endDate) {
+        where.createdAt.lte = query.endDate;
+      }
+    }
+
+    // 按成功状态筛选
+    if (query.success !== undefined) {
+      where.success = query.success;
+    }
+
+    // 2. 查询总数
+    const total = await this.prisma.apiKeyRequestLog.count({ where });
+
+    // 3. 查询列表
+    const logs = await this.prisma.apiKeyRequestLog.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (query.page - 1) * query.limit,
+      take: query.limit,
+      select: {
+        id: true,
+        requestId: true,
+        model: true,
+        inputTokens: true,
+        outputTokens: true,
+        cacheCreationInputTokens: true,
+        cacheReadInputTokens: true,
+        duration: true,
+        timeToFirstToken: true,
+        cost: true,
+        statusCode: true,
+        success: true,
+        errorMessage: true,
+        errorType: true,
+        ipAddress: true,
+        userAgent: true,
+        channelId: true,
+        createdAt: true,
+        metadata: true,
+        apiKey: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        user: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            displayName: true,
+          },
+        },
+        channel: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    return {
+      logs: logs,
+      total,
+      page: query.page,
+      limit: query.limit,
+      pages: Math.ceil(total / query.limit),
+    };
+  }
 }

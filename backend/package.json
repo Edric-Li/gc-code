@@ -27,6 +27,7 @@
     "@nestjs/jwt": "^10.2.0",
     "@nestjs/passport": "^10.0.3",
     "@nestjs/platform-express": "^10.3.0",
+    "@nestjs/schedule": "^6.0.1",
     "@nestjs/swagger": "^7.1.17",
     "@prisma/client": "^5.8.0",
     "@types/passport-azure-ad": "^4.3.6",

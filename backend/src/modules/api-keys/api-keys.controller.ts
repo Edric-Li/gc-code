@@ -93,17 +93,29 @@ export class ApiKeysController {
     return this.apiKeysService.getRanking(req.user.id, query);
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: '查询 API Key 详情' })
-  @ApiParam({ name: 'id', description: 'API Key ID' })
+  @Get('request-logs/all')
+  @ApiOperation({ summary: '获取所有 API Key 的详细请求日志' })
   @ApiResponse({
     status: 200,
-    description: '查询成功',
-    type: ApiKeyResponseEntity,
+    description: '请求日志列表',
   })
-  @ApiResponse({ status: 404, description: 'API Key 不存在' })
-  findOne(@Param('id') id: string, @Request() req): Promise<ApiKeyResponseEntity> {
-    return this.apiKeysService.findOne(id, req.user.id);
+  getAllRequestLogs(
+    @Request() req,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 20,
+    @Query('apiKeyId') apiKeyId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('success') success?: string
+  ) {
+    return this.apiKeysService.getAllRequestLogs(req.user.id, {
+      page: +page,
+      limit: +limit,
+      apiKeyId,
+      startDate: startDate ? new Date(startDate) : undefined,
+      endDate: endDate ? new Date(endDate) : undefined,
+      success: success === 'true' ? true : success === 'false' ? false : undefined,
+    });
   }
 
   @Get(':id/usage')
@@ -121,6 +133,45 @@ export class ApiKeysController {
     @Request() req
   ): Promise<ApiKeyUsageResponse> {
     return this.apiKeysService.getApiKeyUsage(id, req.user.id, query);
+  }
+
+  @Get(':id/request-logs')
+  @ApiOperation({ summary: '获取单个 API Key 的详细请求日志' })
+  @ApiParam({ name: 'id', description: 'API Key ID' })
+  @ApiResponse({
+    status: 200,
+    description: '请求日志列表',
+  })
+  @ApiResponse({ status: 404, description: 'API Key 不存在' })
+  getRequestLogs(
+    @Param('id') id: string,
+    @Request() req,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 20,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('success') success?: string
+  ) {
+    return this.apiKeysService.getRequestLogs(id, req.user.id, {
+      page: +page,
+      limit: +limit,
+      startDate: startDate ? new Date(startDate) : undefined,
+      endDate: endDate ? new Date(endDate) : undefined,
+      success: success === 'true' ? true : success === 'false' ? false : undefined,
+    });
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: '查询 API Key 详情' })
+  @ApiParam({ name: 'id', description: 'API Key ID' })
+  @ApiResponse({
+    status: 200,
+    description: '查询成功',
+    type: ApiKeyResponseEntity,
+  })
+  @ApiResponse({ status: 404, description: 'API Key 不存在' })
+  findOne(@Param('id') id: string, @Request() req): Promise<ApiKeyResponseEntity> {
+    return this.apiKeysService.findOne(id, req.user.id);
   }
 
   @Patch(':id')

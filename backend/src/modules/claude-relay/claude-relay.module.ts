@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { HttpModule } from '@nestjs/axios';
+import { ScheduleModule } from '@nestjs/schedule';
 import { SessionHashService } from './services/session-hash.service';
 import { MemorySessionStorageService } from './services/session-storage/memory-session-storage.service';
 import { ClaudeChannelSelectorService } from './services/claude-channel-selector.service';
@@ -14,11 +15,14 @@ import { SESSION_STORAGE_SERVICE } from './constants';
 import { ApiKeyCacheService } from './services/api-key-cache.service';
 import { ChannelPoolCacheService } from './services/channel-pool-cache.service';
 import { UsageQueueService } from './services/usage-queue.service';
+import { RequestLogQueueService } from './services/request-log-queue.service';
+import { RequestLogCleanupService } from './services/request-log-cleanup.service';
 import { PricingService } from './services/pricing.service';
 
 @Module({
   imports: [
     ConfigModule,
+    ScheduleModule.forRoot(),
     HttpModule.register({
       timeout: 300000, // 5分钟超时
       maxRedirects: 5,
@@ -38,6 +42,8 @@ import { PricingService } from './services/pricing.service';
     ApiKeyCacheService, // API Key 内存缓存
     ChannelPoolCacheService, // 渠道池内存缓存
     UsageQueueService, // 用量统计批量队列
+    RequestLogQueueService, // 请求日志批量队列
+    RequestLogCleanupService, // 请求日志定时清理服务
     PricingService, // 动态定价服务
     ClaudeChannelSelectorService,
     ClaudeProxyService,
@@ -52,6 +58,7 @@ import { PricingService } from './services/pricing.service';
     ApiKeyCacheService,
     ChannelPoolCacheService,
     UsageQueueService,
+    RequestLogQueueService,
   ],
 })
 export class ClaudeRelayModule {}

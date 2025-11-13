@@ -101,4 +101,49 @@ export const apiKeyApi = {
     const query = queryParams.toString();
     return api.get<ApiKeyRankingResponse>(`/api-keys/stats/ranking${query ? `?${query}` : ''}`);
   },
+
+  // 获取详细请求日志
+  getRequestLogs: (
+    id: string,
+    params?: {
+      page?: number;
+      limit?: number;
+      startDate?: string;
+      endDate?: string;
+      success?: boolean;
+    }
+  ) => {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    if (params?.success !== undefined)
+      queryParams.append('success', params.success.toString());
+
+    const query = queryParams.toString();
+    return api.get<Record<string, unknown>>(`/api-keys/${id}/request-logs${query ? `?${query}` : ''}`);
+  },
+
+  // 获取所有 API Key 的详细请求日志
+  getAllRequestLogs: (params?: {
+    page?: number;
+    limit?: number;
+    apiKeyId?: string;
+    startDate?: string;
+    endDate?: string;
+    success?: boolean;
+  }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.apiKeyId) queryParams.append('apiKeyId', params.apiKeyId);
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    if (params?.success !== undefined)
+      queryParams.append('success', params.success.toString());
+
+    const query = queryParams.toString();
+    return api.get<Record<string, unknown>>(`/api-keys/request-logs/all${query ? `?${query}` : ''}`);
+  },
 };

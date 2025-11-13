@@ -109,6 +109,7 @@ model User {
   organizationMembers OrganizationMember[]
   apiKeys             ApiKey[]
   apiKeyUsage         ApiKeyUsage[]
+  apiKeyRequestLogs   ApiKeyRequestLog[]
 
   @@index([email], name: "idx_users_email")
   @@index([username], name: "idx_users_username")
@@ -273,9 +274,10 @@ model ApiKey {
   metadata Json? // 其他元数据
 
   // 关联关系
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  channel      Channel?      @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel      Channel?           @relation(fields: [channelId], references: [id], onDelete: SetNull)
   usageRecords ApiKeyUsage[]
+  requestLogs  ApiKeyRequestLog[]
 
   @@index([userId], name: "idx_api_keys_user_id")
   @@index([channelId], name: "idx_api_keys_channel_id")
@@ -406,10 +408,11 @@ model Channel {
   metadata  Json? // 扩展配置（自定义请求头、代理设置、重试策略等）
 
   // 关联关系
-  provider     AiProvider     @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  provider     AiProvider         @relation(fields: [providerId], references: [id], onDelete: Cascade)
   models       ChannelModel[]
   apiKeys      ApiKey[] // 使用该渠道的 API Keys
   usageRecords ChannelUsage[]
+  requestLogs  ApiKeyRequestLog[]
 
   @@index([providerId], name: "idx_channels_provider_id")
   @@index([status], name: "idx_channels_status")
@@ -469,4 +472,62 @@ model ChannelUsage {
   @@index([apiKeyId], name: "idx_channel_usage_api_key_id")
   @@index([periodStart], name: "idx_channel_usage_period_start")
   @@map("channel_usage")
+}
+
+// API Key 详细请求日志（用于审计和详细分析）
+model ApiKeyRequestLog {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  // 关联字段
+  apiKeyId  String  @map("api_key_id") @db.Uuid
+  userId    String  @map("user_id") @db.Uuid
+  channelId String? @map("channel_id") @db.Uuid
+
+  // 请求信息
+  requestId String @unique @map("request_id") @db.VarChar(255) // 唯一请求ID
+  model     String @db.VarChar(100) // 使用的模型
+
+  // Token 使用（支持 Prompt Caching）
+  inputTokens              Int  @map("input_tokens") // 输入 tokens
+  outputTokens             Int  @map("output_tokens") // 输出 tokens
+  cacheCreationInputTokens Int? @map("cache_creation_input_tokens") // 缓存创建的输入 tokens
+  cacheReadInputTokens     Int? @map("cache_read_input_tokens") // 从缓存读取的输入 tokens
+
+  // 性能指标
+  duration         Int  @map("duration") // 总耗时（毫秒）
+  timeToFirstToken Int? @map("time_to_first_token") // 首字延迟（毫秒）
+
+  // 费用
+  cost Decimal @db.Decimal(12, 4) // 本次请求费用
+
+  // 状态
+  statusCode   Int      @map("status_code") // HTTP 状态码
+  success      Boolean // 是否成功
+  errorMessage String?  @map("error_message") @db.Text // 错误信息
+  errorType    String?  @map("error_type") @db.VarChar(50) // 错误类型
+
+  // 安全审计
+  ipAddress String? @map("ip_address") @db.VarChar(100) // 请求IP
+  userAgent String? @map("user_agent") @db.Text // 客户端信息
+
+  // 时间
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(3)
+
+  // 元数据
+  metadata Json? // 扩展字段（如请求参数、响应头等）
+
+  // 关联关系
+  apiKey  ApiKey   @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel Channel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+
+  // 索引优化
+  @@index([apiKeyId, createdAt(sort: Desc)], name: "idx_request_log_key_time")
+  @@index([userId, createdAt(sort: Desc)], name: "idx_request_log_user_time")
+  @@index([channelId, createdAt(sort: Desc)], name: "idx_request_log_channel_time")
+  @@index([model], name: "idx_request_log_model")
+  @@index([success], name: "idx_request_log_success")
+  @@index([createdAt], name: "idx_request_log_created_at")
+  @@index([requestId], name: "idx_request_log_request_id")
+  @@map("api_key_request_logs")
 }

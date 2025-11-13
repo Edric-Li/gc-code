@@ -23,6 +23,7 @@ import {
 import { ApiKeyCacheService } from './services/api-key-cache.service';
 import { ChannelPoolCacheService } from './services/channel-pool-cache.service';
 import { UsageQueueService } from './services/usage-queue.service';
+import { randomUUID } from 'crypto';
 
 /**
  * Claude API 中继 Controller
@@ -40,6 +41,27 @@ export class ClaudeRelayController {
     private channelPoolCache: ChannelPoolCacheService,
     private usageQueue: UsageQueueService
   ) {}
+
+  /**
+   * 获取客户端真实 IP 地址（支持代理）
+   */
+  private getClientIp(req: Request): string {
+    // 尝试从 X-Forwarded-For 获取
+    const forwarded = req.headers['x-forwarded-for'];
+    if (forwarded) {
+      const ip = typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : forwarded[0];
+      if (ip) return ip;
+    }
+
+    // 尝试从 X-Real-IP 获取
+    const realIp = req.headers['x-real-ip'];
+    if (realIp && typeof realIp === 'string') {
+      return realIp;
+    }
+
+    // 使用连接 IP
+    return req.ip || req.socket?.remoteAddress || 'unknown';
+  }
 
   /**
    * POST /v1/messages
@@ -95,6 +117,9 @@ export class ClaudeRelayController {
     headers: Record<string, string>,
     res: Response
   ) {
+    const requestId = randomUUID();
+    const startTime = Date.now();
+
     const result = await this.proxyService.proxyRequest(
       apiKey,
       'v1/messages',
@@ -102,6 +127,8 @@ export class ClaudeRelayController {
       body,
       headers
     );
+
+    const duration = Date.now() - startTime;
 
     // 转发响应头
     Object.entries(result.headers).forEach(([key, value]) => {
@@ -125,7 +152,7 @@ export class ClaudeRelayController {
           cacheCreation: responseData.usage.cache_creation,
         });
 
-        // 异步记录，不等待
+        // 异步记录聚合用量，不等待
         this.usageTracking
           .recordUsage({
             apiKeyId: apiKey.id,
@@ -137,6 +164,34 @@ export class ClaudeRelayController {
           })
           .catch((err) => {
             this.logger.error(`Failed to record usage: ${err.message}`);
+          });
+
+        // 异步记录详细请求日志，不等待
+        this.usageTracking
+          .recordRequestLog({
+            apiKeyId: apiKey.id,
+            userId: apiKey.user.id,
+            channelId: apiKey.channelId || undefined,
+            requestId,
+            model: body.model,
+            inputTokens: responseData.usage.input_tokens,
+            outputTokens: responseData.usage.output_tokens,
+            cacheCreationInputTokens: responseData.usage.cache_creation_input_tokens,
+            cacheReadInputTokens: responseData.usage.cache_read_input_tokens,
+            duration,
+            timeToFirstToken: undefined, // 非流式请求无首字延迟
+            cost,
+            statusCode: result.status,
+            success: true,
+            ipAddress: this.getClientIp(res.req),
+            userAgent: headers['user-agent'],
+            metadata: {
+              model: body.model,
+              stopReason: responseData.stop_reason,
+            },
+          })
+          .catch((err) => {
+            this.logger.error(`Failed to record request log: ${err.message}`);
           });
       }
     }
@@ -154,6 +209,10 @@ export class ClaudeRelayController {
     headers: Record<string, string>,
     res: Response
   ) {
+    const requestId = randomUUID();
+    const startTime = Date.now();
+    let timeToFirstToken: number | undefined;
+
     const { channel, stream } = await this.proxyService.proxyStreamRequest(
       apiKey,
       'v1/messages',
@@ -178,10 +237,17 @@ export class ClaudeRelayController {
       | { ephemeral_5m_input_tokens?: number; ephemeral_1h_input_tokens?: number }
       | undefined;
     let isSuccess = true;
+    let firstTokenReceived = false;
 
     // 拦截流数据以提取usage信息
     let buffer = '';
     stream.on('data', (chunk: Buffer) => {
+      // 记录首字延迟
+      if (!firstTokenReceived) {
+        timeToFirstToken = Date.now() - startTime;
+        firstTokenReceived = true;
+      }
+
       const text = chunk.toString();
       buffer += text;
 
@@ -210,7 +276,7 @@ export class ClaudeRelayController {
             if (data.type === 'message_delta' && data.usage) {
               totalOutputTokens = data.usage.output_tokens || 0;
             }
-          } catch (e) {
+          } catch (_error) {
             // 忽略JSON解析错误
           }
         }
@@ -238,6 +304,7 @@ export class ClaudeRelayController {
     // 流结束时记录usage
     stream.on('end', () => {
       this.logger.log('Stream completed');
+      const duration = Date.now() - startTime;
 
       // 记录用量 (包括缓存)
       if (isSuccess && (totalInputTokens > 0 || totalOutputTokens > 0)) {
@@ -250,6 +317,7 @@ export class ClaudeRelayController {
           cacheCreation,
         });
 
+        // 异步记录聚合用量，不等待
         this.usageTracking
           .recordUsage({
             apiKeyId: apiKey.id,
@@ -263,10 +331,38 @@ export class ClaudeRelayController {
             this.logger.error(`Failed to record stream usage: ${err.message}`);
           });
 
+        // 异步记录详细请求日志，不等待
+        this.usageTracking
+          .recordRequestLog({
+            apiKeyId: apiKey.id,
+            userId: apiKey.user.id,
+            channelId: channel.id,
+            requestId,
+            model: body.model,
+            inputTokens: totalInputTokens,
+            outputTokens: totalOutputTokens,
+            cacheCreationInputTokens: totalCacheCreationTokens,
+            cacheReadInputTokens: totalCacheReadTokens,
+            duration,
+            timeToFirstToken,
+            cost,
+            statusCode: 200, // 流式请求成功默认为 200
+            success: true,
+            ipAddress: this.getClientIp(res.req),
+            userAgent: headers['user-agent'],
+            metadata: {
+              model: body.model,
+              stream: true,
+            },
+          })
+          .catch((err) => {
+            this.logger.error(`Failed to record stream request log: ${err.message}`);
+          });
+
         this.logger.debug(
           `Stream usage: ${totalInputTokens} input + ${totalOutputTokens} output + ` +
             `${totalCacheCreationTokens} cache_write + ${totalCacheReadTokens} cache_read tokens, ` +
-            `cost: $${cost.toFixed(6)}`
+            `cost: $${cost.toFixed(6)}, duration: ${duration}ms, TTFT: ${timeToFirstToken}ms`
         );
       }
 
