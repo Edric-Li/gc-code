@@ -11,8 +11,12 @@ import type {
 } from '../types/apiKey';
 
 export const apiKeyApi = {
-  // 创建 API Key
+  // 创建 API Key（管理员）
   create: (data: CreateApiKeyDto) => api.post<ApiKey>('/api-keys', data),
+
+  // 为当前用户创建 API Key（普通用户）
+  createMyKey: (data: Omit<CreateApiKeyDto, 'userId'>) =>
+    api.post<ApiKey>('/api-keys/my-keys', data),
 
   // 查询 API Key 列表（分页）
   list: async (params: QueryApiKeysDto = {}) => {
@@ -118,18 +122,20 @@ export const apiKeyApi = {
     if (params?.limit) queryParams.append('limit', params.limit.toString());
     if (params?.startDate) queryParams.append('startDate', params.startDate);
     if (params?.endDate) queryParams.append('endDate', params.endDate);
-    if (params?.success !== undefined)
-      queryParams.append('success', params.success.toString());
+    if (params?.success !== undefined) queryParams.append('success', params.success.toString());
 
     const query = queryParams.toString();
-    return api.get<Record<string, unknown>>(`/api-keys/${id}/request-logs${query ? `?${query}` : ''}`);
+    return api.get<Record<string, unknown>>(
+      `/api-keys/${id}/request-logs${query ? `?${query}` : ''}`
+    );
   },
 
   // 获取所有 API Key 的详细请求日志
   getAllRequestLogs: (params?: {
     page?: number;
     limit?: number;
-    apiKeyId?: string;
+    apiKeyIds?: string[];
+    models?: string[];
     startDate?: string;
     endDate?: string;
     success?: boolean;
@@ -137,13 +143,34 @@ export const apiKeyApi = {
     const queryParams = new URLSearchParams();
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
-    if (params?.apiKeyId) queryParams.append('apiKeyId', params.apiKeyId);
+    if (params?.apiKeyIds) {
+      params.apiKeyIds.forEach((id) => queryParams.append('apiKeyIds', id));
+    }
+    if (params?.models) {
+      params.models.forEach((model) => queryParams.append('models', model));
+    }
     if (params?.startDate) queryParams.append('startDate', params.startDate);
     if (params?.endDate) queryParams.append('endDate', params.endDate);
-    if (params?.success !== undefined)
-      queryParams.append('success', params.success.toString());
+    if (params?.success !== undefined) queryParams.append('success', params.success.toString());
 
     const query = queryParams.toString();
-    return api.get<Record<string, unknown>>(`/api-keys/request-logs/all${query ? `?${query}` : ''}`);
+    return api.get<Record<string, unknown>>(
+      `/api-keys/request-logs/all${query ? `?${query}` : ''}`
+    );
   },
+
+  // 获取所有使用过的模型列表
+  getUsedModels: () => api.get<string[]>(`/api-keys/request-logs/models`),
+
+  // 检查名称是否可用（用户自己的）
+  checkMyNameAvailable: (name: string) =>
+    api.get<{ available: boolean; message?: string }>(
+      `/api-keys/check-my-name/${encodeURIComponent(name)}`
+    ),
+
+  // 检查名称是否可用（管理员为其他用户检查）
+  checkNameAvailable: (userId: string, name: string) =>
+    api.get<{ available: boolean; message?: string }>(
+      `/api-keys/check-name/${userId}/${encodeURIComponent(name)}`
+    ),
 };

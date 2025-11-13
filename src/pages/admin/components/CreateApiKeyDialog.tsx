@@ -4,6 +4,7 @@ import type { CreateApiKeyDto } from '@/types/apiKey';
 import { userApi, type SimpleUser } from '@/services/userApi';
 import { channelApi } from '@/services/channelApi';
 import type { Channel } from '@/types/channel';
+import { checkApiKeyNameAvailable } from '@/utils/apiKeyValidation';
 
 interface CreateApiKeyDialogProps {
   onClose: () => void;
@@ -36,7 +37,7 @@ export default function CreateApiKeyDialog({ onClose, onCreate }: CreateApiKeyDi
       setLoadingUsers(true);
       const userList = await userApi.getSimpleList();
       setUsers(userList);
-    } catch (_err) {
+    } catch {
       setError('加载用户列表失败');
     } finally {
       setLoadingUsers(false);
@@ -48,7 +49,7 @@ export default function CreateApiKeyDialog({ onClose, onCreate }: CreateApiKeyDi
       setLoadingChannels(true);
       const response = await channelApi.list({ status: 'ACTIVE', limit: 100 });
       setChannels(response.data);
-    } catch (_err) {
+    } catch {
       // Silently fail - channel selection is optional
     } finally {
       setLoadingChannels(false);
@@ -61,9 +62,21 @@ export default function CreateApiKeyDialog({ onClose, onCreate }: CreateApiKeyDi
       setLoading(true);
       setError('');
 
+      const name = formData.name.trim() || 'default';
+
+      // 检查该用户下是否已存在同名 API Key（使用优化的 API）
+      if (formData.userId) {
+        const checkResult = await checkApiKeyNameAvailable(formData.userId, name);
+        if (!checkResult.available) {
+          setError(`该用户已存在名为 "${name}" 的 API Key，请使用其他名称`);
+          setLoading(false);
+          return;
+        }
+      }
+
       // 清理数据
       const cleanData: CreateApiKeyDto = {
-        name: formData.name.trim(),
+        name: name,
         userId: formData.userId,
       };
 
@@ -144,14 +157,13 @@ export default function CreateApiKeyDialog({ onClose, onCreate }: CreateApiKeyDi
           {/* API Key Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              API Key 名称 <span className="text-red-500">*</span>
+              API Key 名称
             </label>
             <input
               type="text"
-              required
               value={formData.name}
               onChange={(e) => handleChange('name', e.target.value)}
-              placeholder="例如: Production API Key"
+              placeholder="留空将使用默认名称 'default'"
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -241,7 +253,7 @@ export default function CreateApiKeyDialog({ onClose, onCreate }: CreateApiKeyDi
             </button>
             <button
               type="submit"
-              disabled={loading || !formData.name.trim() || !formData.userId}
+              disabled={loading || !formData.userId}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? '创建中...' : '创建'}

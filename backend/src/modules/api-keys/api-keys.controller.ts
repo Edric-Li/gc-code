@@ -57,6 +57,27 @@ export class ApiKeysController {
     return this.apiKeysService.create(req.user.id, createApiKeyDto);
   }
 
+  @Post('my-keys')
+  @ApiOperation({ summary: '为当前用户创建 API Key（普通用户，限制20个）' })
+  @ApiResponse({
+    status: 201,
+    description: 'API Key 创建成功',
+    type: ApiKeyResponseEntity,
+  })
+  @ApiResponse({ status: 400, description: '请求参数错误或已达到创建上限' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  async createMyKey(
+    @Body() createDto: Omit<CreateApiKeyDto, 'userId'>,
+    @Request() req
+  ): Promise<ApiKeyResponseEntity> {
+    // 自动填充 userId 为当前用户
+    const createApiKeyDto: CreateApiKeyDto = {
+      ...createDto,
+      userId: req.user.id,
+    };
+    return this.apiKeysService.createForUser(req.user.id, createApiKeyDto);
+  }
+
   @Get()
   @ApiOperation({ summary: '查询 API Key 列表（分页）' })
   @ApiResponse({
@@ -103,19 +124,43 @@ export class ApiKeysController {
     @Request() req,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 20,
-    @Query('apiKeyId') apiKeyId?: string,
+    @Query('apiKeyIds') apiKeyIds?: string | string[],
+    @Query('models') models?: string | string[],
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('success') success?: string
   ) {
+    // 处理多选参数：确保转换为数组
+    const apiKeyIdsArray = apiKeyIds
+      ? Array.isArray(apiKeyIds)
+        ? apiKeyIds
+        : [apiKeyIds]
+      : undefined;
+    const modelsArray = models ? (Array.isArray(models) ? models : [models]) : undefined;
+
     return this.apiKeysService.getAllRequestLogs(req.user.id, {
       page: +page,
       limit: +limit,
-      apiKeyId,
+      apiKeyIds: apiKeyIdsArray,
+      models: modelsArray,
       startDate: startDate ? new Date(startDate) : undefined,
       endDate: endDate ? new Date(endDate) : undefined,
       success: success === 'true' ? true : success === 'false' ? false : undefined,
     });
+  }
+
+  @Get('request-logs/models')
+  @ApiOperation({ summary: '获取所有使用过的模型列表' })
+  @ApiResponse({
+    status: 200,
+    description: '模型列表',
+    schema: {
+      type: 'array',
+      items: { type: 'string' },
+    },
+  })
+  getUsedModels(@Request() req) {
+    return this.apiKeysService.getUsedModels(req.user.id);
   }
 
   @Get(':id/usage')
@@ -253,5 +298,44 @@ export class ApiKeysController {
   @ApiResponse({ status: 400, description: 'API Key 未被删除' })
   restore(@Param('id') id: string, @Request() req) {
     return this.apiKeysService.restore(id, req.user.id);
+  }
+
+  @Get('check-name/:userId/:name')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: '检查 API Key 名称是否可用（管理员）' })
+  @ApiParam({ name: 'userId', description: '用户 ID' })
+  @ApiParam({ name: 'name', description: 'API Key 名称' })
+  @ApiResponse({
+    status: 200,
+    description: '检查结果',
+    schema: {
+      type: 'object',
+      properties: {
+        available: { type: 'boolean' },
+        message: { type: 'string' },
+      },
+    },
+  })
+  checkNameAvailable(@Param('userId') userId: string, @Param('name') name: string) {
+    return this.apiKeysService.checkNameAvailable(userId, name);
+  }
+
+  @Get('check-my-name/:name')
+  @ApiOperation({ summary: '检查自己的 API Key 名称是否可用' })
+  @ApiParam({ name: 'name', description: 'API Key 名称' })
+  @ApiResponse({
+    status: 200,
+    description: '检查结果',
+    schema: {
+      type: 'object',
+      properties: {
+        available: { type: 'boolean' },
+        message: { type: 'string' },
+      },
+    },
+  })
+  checkMyNameAvailable(@Param('name') name: string, @Request() req) {
+    return this.apiKeysService.checkNameAvailable(req.user.id, name);
   }
 }

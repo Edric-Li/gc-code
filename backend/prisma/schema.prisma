@@ -279,6 +279,7 @@ model ApiKey {
   usageRecords ApiKeyUsage[]
   requestLogs  ApiKeyRequestLog[]
 
+  @@unique([userId, name, deletedAt], name: "unique_user_apikey_name")
   @@index([userId], name: "idx_api_keys_user_id")
   @@index([channelId], name: "idx_api_keys_channel_id")
   @@index([key], name: "idx_api_keys_key")

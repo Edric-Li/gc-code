@@ -67,6 +67,24 @@ export class ApiKeysService {
       throw new BadRequestException('Cannot create API key for inactive user');
     }
 
+    // 检查该用户下是否已存在同名 API Key（排除已删除的）
+    const existingKey = await this.prisma.apiKey.findFirst({
+      where: {
+        userId: targetUserId,
+        name: createApiKeyDto.name,
+        status: {
+          not: KeyStatus.DELETED,
+        },
+        deletedAt: null,
+      },
+    });
+
+    if (existingKey) {
+      throw new BadRequestException(
+        `API key with name "${createApiKeyDto.name}" already exists for this user`
+      );
+    }
+
     // 生成 API Key（明文存储）
     const key = this.generateKey();
 
@@ -102,6 +120,126 @@ export class ApiKeysService {
         status: KeyStatus.ACTIVE,
       },
     });
+
+    // 返回响应
+    return {
+      id: apiKey.id,
+      userId: apiKey.userId,
+      name: apiKey.name,
+      description: apiKey.description,
+      key: apiKey.key,
+      status: apiKey.status,
+      dailyCostLimit: apiKey.dailyCostLimit ? parseFloat(apiKey.dailyCostLimit.toString()) : null,
+      expiresAt: apiKey.expiresAt,
+      lastUsedAt: apiKey.lastUsedAt,
+      createdAt: apiKey.createdAt,
+      updatedAt: apiKey.updatedAt,
+    };
+  }
+
+  /**
+   * 为普通用户创建 API Key（限制每个用户最多20个）
+   */
+  async createForUser(
+    currentUserId: string,
+    createApiKeyDto: CreateApiKeyDto
+  ): Promise<ApiKeyResponseEntity> {
+    const targetUserId = createApiKeyDto.userId;
+
+    // 确保用户只能为自己创建 API Key
+    if (currentUserId !== targetUserId) {
+      throw new UnauthorizedException('You can only create API keys for yourself');
+    }
+
+    // 验证目标用户是否存在
+    const targetUser = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+    });
+
+    if (!targetUser) {
+      throw new NotFoundException(`User with ID ${targetUserId} not found`);
+    }
+
+    if (!targetUser.isActive) {
+      throw new BadRequestException('Cannot create API key for inactive user');
+    }
+
+    // 检查用户当前的 API Key 数量（排除已删除的）
+    const existingKeysCount = await this.prisma.apiKey.count({
+      where: {
+        userId: targetUserId,
+        deletedAt: null,
+        status: {
+          not: KeyStatus.DELETED,
+        },
+      },
+    });
+
+    // 限制每个用户最多创建 20 个 API Key
+    const MAX_KEYS_PER_USER = 20;
+    if (existingKeysCount >= MAX_KEYS_PER_USER) {
+      throw new BadRequestException(
+        `You have reached the maximum limit of ${MAX_KEYS_PER_USER} API keys. Please delete unused keys before creating new ones.`
+      );
+    }
+
+    // 检查该用户下是否已存在同名 API Key（排除已删除的）
+    const existingKey = await this.prisma.apiKey.findFirst({
+      where: {
+        userId: targetUserId,
+        name: createApiKeyDto.name,
+        status: {
+          not: KeyStatus.DELETED,
+        },
+        deletedAt: null,
+      },
+    });
+
+    if (existingKey) {
+      throw new BadRequestException(
+        `API key with name "${createApiKeyDto.name}" already exists for this user`
+      );
+    }
+
+    // 生成 API Key（明文存储）
+    const key = this.generateKey();
+
+    // 转换日期字符串
+    const expiresAt = createApiKeyDto.expiresAt ? new Date(createApiKeyDto.expiresAt) : null;
+
+    // 如果指定了channelId，验证渠道是否存在
+    if (createApiKeyDto.channelId) {
+      const channel = await this.prisma.channel.findFirst({
+        where: {
+          id: createApiKeyDto.channelId,
+          deletedAt: null,
+        },
+      });
+
+      if (!channel) {
+        throw new NotFoundException(`Channel with ID ${createApiKeyDto.channelId} not found`);
+      }
+    }
+
+    // 创建 API Key 记录
+    const apiKey = await this.prisma.apiKey.create({
+      data: {
+        userId: targetUserId,
+        channelId: createApiKeyDto.channelId || null,
+        name: createApiKeyDto.name,
+        description: createApiKeyDto.description,
+        key,
+        dailyCostLimit: createApiKeyDto.dailyCostLimit
+          ? new Prisma.Decimal(createApiKeyDto.dailyCostLimit)
+          : null,
+        expiresAt,
+        status: KeyStatus.ACTIVE,
+      },
+    });
+
+    this.logger.log(
+      `User ${currentUserId} created API key ${apiKey.id} (${existingKeysCount + 1}/${MAX_KEYS_PER_USER})`
+    );
 
     // 返回响应
     return {
@@ -654,10 +792,18 @@ export class ApiKeysService {
    */
   async getOverview(userId: string, query: ApiKeyStatsQueryDto): Promise<ApiKeyStatsOverview> {
     // 设置默认时间范围（最近 30 天）
-    const endDate = query.endDate ? new Date(query.endDate) : new Date();
-    const startDate = query.startDate
+    let endDate = query.endDate ? new Date(query.endDate) : new Date();
+    let startDate = query.startDate
       ? new Date(query.startDate)
       : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    // 将 endDate 设置为当天的结束时间（23:59:59.999）
+    endDate = new Date(endDate);
+    endDate.setHours(23, 59, 59, 999);
+
+    // 将 startDate 设置为当天的开始时间（00:00:00.000）
+    startDate = new Date(startDate);
+    startDate.setHours(0, 0, 0, 0);
 
     // 获取用户所有 API Key 的统计
     const apiKeyStats = await this.prisma.apiKey.groupBy({
@@ -671,24 +817,94 @@ export class ApiKeysService {
     const expiredApiKeys = apiKeyStats.find((s) => s.status === KeyStatus.EXPIRED)?._count.id || 0;
     const revokedApiKeys = apiKeyStats.find((s) => s.status === KeyStatus.REVOKED)?._count.id || 0;
 
-    // 获取用量统计
-    const usageStats = await this.prisma.apiKeyUsage.aggregate({
+    // 从 ApiKeyRequestLog 获取统计数据（统一数据源以保证一致性）
+    const requestLogStats = await this.prisma.apiKeyRequestLog.aggregate({
       where: {
         userId,
-        periodStart: { gte: startDate, lte: endDate },
+        createdAt: { gte: startDate, lte: endDate },
+      },
+      _count: {
+        id: true,
       },
       _sum: {
-        requestCount: true,
-        successCount: true,
-        failureCount: true,
+        inputTokens: true,
+        outputTokens: true,
         cost: true,
       },
     });
 
-    const totalRequests = usageStats._sum.requestCount || 0;
-    const successCount = usageStats._sum.successCount || 0;
-    const failureCount = usageStats._sum.failureCount || 0;
-    const totalCost = usageStats._sum.cost ? parseFloat(usageStats._sum.cost.toString()) : 0;
+    // 统计成功和失败的请求
+    const successFailureStats = await this.prisma.apiKeyRequestLog.groupBy({
+      by: ['status'],
+      where: {
+        userId,
+        createdAt: { gte: startDate, lte: endDate },
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    const totalRequests = requestLogStats._count.id || 0;
+    const successCount = successFailureStats.find((s) => s.status === 200)?._count.id || 0;
+    const failureCount = totalRequests - successCount;
+    const totalCost = requestLogStats._sum.cost
+      ? parseFloat(requestLogStats._sum.cost.toString())
+      : 0;
+
+    const inputTokens = requestLogStats._sum.inputTokens || 0;
+    const outputTokens = requestLogStats._sum.outputTokens || 0;
+    const totalTokens = inputTokens + outputTokens;
+
+    // 获取模型使用分布
+    const modelDistributionData = await this.prisma.apiKeyRequestLog.groupBy({
+      by: ['model'],
+      where: {
+        userId,
+        createdAt: { gte: startDate, lte: endDate },
+      },
+      _count: {
+        id: true,
+      },
+      _sum: {
+        inputTokens: true,
+        outputTokens: true,
+        cost: true,
+      },
+    });
+
+    const modelDistribution = modelDistributionData.map((item) => ({
+      model: item.model,
+      requests: item._count.id,
+      tokens: (item._sum.inputTokens || 0) + (item._sum.outputTokens || 0),
+      cost: item._sum.cost ? parseFloat(item._sum.cost.toString()) : 0,
+    }));
+
+    // 验证数据一致性
+    const modelTotalRequests = modelDistribution.reduce((sum, m) => sum + m.requests, 0);
+    const modelTotalCost = modelDistribution.reduce((sum, m) => sum + m.cost, 0);
+    const modelTotalTokens = modelDistribution.reduce((sum, m) => sum + m.tokens, 0);
+
+    this.logger.log('📊 Overview Stats Verification:', {
+      userId,
+      period: { startDate, endDate },
+      totals: {
+        requests: totalRequests,
+        cost: totalCost,
+        tokens: totalTokens,
+      },
+      modelTotals: {
+        requests: modelTotalRequests,
+        cost: modelTotalCost,
+        tokens: modelTotalTokens,
+      },
+      difference: {
+        requests: totalRequests - modelTotalRequests,
+        cost: (totalCost - modelTotalCost).toFixed(4),
+        tokens: totalTokens - modelTotalTokens,
+      },
+      modelDistribution,
+    });
 
     return {
       totalApiKeys,
@@ -701,6 +917,10 @@ export class ApiKeysService {
       successRate: totalRequests > 0 ? (successCount / totalRequests) * 100 : 0,
       totalCost,
       avgCostPerRequest: totalRequests > 0 ? totalCost / totalRequests : 0,
+      totalTokens,
+      inputTokens,
+      outputTokens,
+      modelDistribution: modelDistribution.length > 0 ? modelDistribution : undefined,
       periodStart: startDate,
       periodEnd: endDate,
     };
@@ -950,7 +1170,8 @@ export class ApiKeysService {
     query: {
       page: number;
       limit: number;
-      apiKeyId?: string;
+      apiKeyIds?: string[];
+      models?: string[];
       startDate?: Date;
       endDate?: Date;
       success?: boolean;
@@ -959,16 +1180,22 @@ export class ApiKeysService {
     // 1. 构建查询条件 - 只查询当前用户的 API Keys
     const where: {
       userId: string;
-      apiKeyId?: string;
+      apiKeyId?: { in: string[] };
+      model?: { in: string[] };
       createdAt?: { gte?: Date; lte?: Date };
       success?: boolean;
     } = {
       userId, // 确保只查询当前用户的数据
     };
 
-    // 按 API Key 筛选
-    if (query.apiKeyId) {
-      where.apiKeyId = query.apiKeyId;
+    // 按 API Key 筛选（支持多选）
+    if (query.apiKeyIds && query.apiKeyIds.length > 0) {
+      where.apiKeyId = { in: query.apiKeyIds };
+    }
+
+    // 按模型筛选（支持多选）
+    if (query.models && query.models.length > 0) {
+      where.model = { in: query.models };
     }
 
     // 按时间筛选
@@ -1045,6 +1272,61 @@ export class ApiKeysService {
       page: query.page,
       limit: query.limit,
       pages: Math.ceil(total / query.limit),
+    };
+  }
+
+  /**
+   * 获取所有使用过的模型列表
+   */
+  async getUsedModels(userId: string): Promise<string[]> {
+    const models = await this.prisma.apiKeyRequestLog.findMany({
+      where: {
+        userId,
+      },
+      select: {
+        model: true,
+      },
+      distinct: ['model'],
+      orderBy: {
+        model: 'asc',
+      },
+    });
+
+    return models.map((m) => m.model);
+  }
+
+  /**
+   * 检查 API Key 名称是否可用
+   * 用于前端实时验证，避免传输大量数据
+   */
+  async checkNameAvailable(
+    userId: string,
+    name: string
+  ): Promise<{ available: boolean; message?: string }> {
+    const existingKey = await this.prisma.apiKey.findFirst({
+      where: {
+        userId,
+        name,
+        status: {
+          not: KeyStatus.DELETED,
+        },
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    if (existingKey) {
+      return {
+        available: false,
+        message: `API key with name "${name}" already exists for this user`,
+      };
+    }
+
+    return {
+      available: true,
     };
   }
 }
