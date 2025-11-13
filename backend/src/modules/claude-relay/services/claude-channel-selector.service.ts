@@ -5,6 +5,7 @@ import { SessionHashService } from './session-hash.service';
 import { ISessionStorageService } from './session-storage/session-storage.interface';
 import { SESSION_STORAGE_SERVICE } from '../constants';
 import { ApiKeyInfo, ClaudeMessagesRequest } from '../interfaces/claude-api.interface';
+import { ChannelPoolCacheService } from './channel-pool-cache.service';
 
 @Injectable()
 export class ClaudeChannelSelectorService {
@@ -13,7 +14,8 @@ export class ClaudeChannelSelectorService {
   constructor(
     private prisma: PrismaService,
     private sessionHashService: SessionHashService,
-    @Inject(SESSION_STORAGE_SERVICE) private sessionStorage: ISessionStorageService,
+    private channelPoolCache: ChannelPoolCacheService,
+    @Inject(SESSION_STORAGE_SERVICE) private sessionStorage: ISessionStorageService
   ) {}
 
   /**
@@ -25,15 +27,10 @@ export class ClaudeChannelSelectorService {
 
     // 2. 如果有会话哈希，尝试使用 Sticky Session
     if (sessionHash) {
-      const stickyChannel = await this.tryGetStickyChannel(
-        sessionHash,
-        apiKey.id,
-      );
+      const stickyChannel = await this.tryGetStickyChannel(sessionHash, apiKey.id);
 
       if (stickyChannel) {
-        this.logger.log(
-          `✅ Sticky session hit: ${sessionHash} → ${stickyChannel.name}`,
-        );
+        this.logger.log(`✅ Sticky session hit: ${sessionHash} → ${stickyChannel.name}`);
 
         // 更新映射（增加请求计数）
         await this.sessionStorage.updateMapping(sessionHash);
@@ -50,14 +47,8 @@ export class ClaudeChannelSelectorService {
 
     // 4. 建立新的会话映射
     if (sessionHash) {
-      await this.sessionStorage.setMapping(
-        sessionHash,
-        newChannel.id,
-        apiKey.id,
-      );
-      this.logger.log(
-        `🆕 Created sticky session: ${sessionHash} → ${newChannel.name}`,
-      );
+      await this.sessionStorage.setMapping(sessionHash, newChannel.id, apiKey.id);
+      this.logger.log(`🆕 Created sticky session: ${sessionHash} → ${newChannel.name}`);
     }
 
     return newChannel;
@@ -80,11 +71,11 @@ export class ClaudeChannelSelectorService {
   }
 
   /**
-   * 尝试获取 Sticky Session 对应的渠道
+   * 尝试获取 Sticky Session 对应的渠道（优先使用缓存）
    */
   private async tryGetStickyChannel(
     sessionHash: string,
-    apiKeyId: string,
+    apiKeyId: string
   ): Promise<Channel | null> {
     try {
       // 获取会话映射
@@ -96,35 +87,23 @@ export class ClaudeChannelSelectorService {
 
       // 验证 API Key 是否匹配（防止跨用户使用）
       if (mapping.apiKeyId !== apiKeyId) {
-        this.logger.warn(
-          `⚠️ Session API Key mismatch: ${sessionHash}`,
-        );
+        this.logger.warn(`⚠️ Session API Key mismatch: ${sessionHash}`);
         return null;
       }
 
-      // 检查渠道是否仍然可用
-      const channel = await this.prisma.channel.findFirst({
-        where: {
-          id: mapping.channelId,
-          isActive: true,
-          deletedAt: null,
-        },
-      });
+      // 优先从缓存获取渠道（指定绑定渠道 ID）
+      const channel = await this.channelPoolCache.getChannel(mapping.channelId);
 
       if (!channel) {
-        this.logger.warn(
-          `⚠️ Mapped channel not found: ${mapping.channelId}`,
-        );
+        this.logger.warn(`⚠️ Mapped channel not found or unavailable: ${mapping.channelId}`);
         // 删除无效映射
         await this.sessionStorage.deleteMapping(sessionHash);
         return null;
       }
 
-      // 检查渠道状态
+      // 检查渠道状态（缓存可能稍有延迟）
       if (channel.status !== ChannelStatus.ACTIVE) {
-        this.logger.warn(
-          `⚠️ Mapped channel not active: ${channel.name} (${channel.status})`,
-        );
+        this.logger.warn(`⚠️ Mapped channel not active: ${channel.name} (${channel.status})`);
 
         // 如果是限流且已过期，尝试恢复
         if (
@@ -133,6 +112,8 @@ export class ClaudeChannelSelectorService {
           new Date() > channel.rateLimitEndAt
         ) {
           await this.restoreChannel(channel.id);
+          // 刷新缓存中的渠道信息
+          await this.channelPoolCache.refresh();
           return channel;
         }
 
@@ -149,59 +130,31 @@ export class ClaudeChannelSelectorService {
   }
 
   /**
-   * 选择新渠道
+   * 选择新渠道（优先使用缓存）
    */
   private async selectNewChannel(apiKey: ApiKeyInfo): Promise<Channel> {
-    // 1. 如果 API Key 绑定了特定渠道，使用绑定的渠道
-    if (apiKey.channelId) {
-      const channel = await this.prisma.channel.findFirst({
-        where: {
-          id: apiKey.channelId,
-          isActive: true,
-          status: ChannelStatus.ACTIVE,
-          deletedAt: null,
-        },
+    // 从缓存池获取渠道（如果有绑定渠道，传递 channelId）
+    const channel = await this.channelPoolCache.getChannel(apiKey.channelId || undefined);
+
+    if (!channel) {
+      if (apiKey.channelId) {
+        throw new BadRequestException('Bound channel is not available');
+      } else {
+        throw new BadRequestException('No available Claude channels');
+      }
+    }
+
+    // 异步更新最后使用时间（不阻塞响应）
+    this.prisma.channel
+      .update({
+        where: { id: channel.id },
+        data: { lastUsedAt: new Date() },
+      })
+      .catch((error) => {
+        this.logger.error(`Failed to update channel lastUsedAt: ${error.message}`);
       });
 
-      if (!channel) {
-        throw new BadRequestException('Bound channel is not available');
-      }
-
-      return channel;
-    }
-
-    // 2. 从共享渠道池中选择可用渠道
-    const availableChannels = await this.prisma.channel.findMany({
-      where: {
-        isActive: true,
-        status: ChannelStatus.ACTIVE,
-        deletedAt: null,
-        // 不在限流中
-        OR: [
-          { rateLimitEndAt: null },
-          { rateLimitEndAt: { lte: new Date() } },
-        ],
-      },
-      orderBy: [
-        { priority: 'asc' },      // 优先级排序
-        { lastUsedAt: 'asc' },    // 最久未使用优先
-      ],
-    });
-
-    if (availableChannels.length === 0) {
-      throw new BadRequestException('No available Claude channels');
-    }
-
-    // 选择第一个渠道
-    const selectedChannel = availableChannels[0];
-
-    // 更新最后使用时间
-    await this.prisma.channel.update({
-      where: { id: selectedChannel.id },
-      data: { lastUsedAt: new Date() },
-    });
-
-    return selectedChannel;
+    return channel;
   }
 
   /**
@@ -217,6 +170,10 @@ export class ClaudeChannelSelectorService {
         rateLimitEndAt: resetTime,
       },
     });
+
+    // 从缓存池中移除该渠道
+    this.channelPoolCache.markChannelUnavailable(channelId);
+    this.logger.log(`Channel ${channelId} marked as rate limited and removed from cache`);
   }
 
   /**
@@ -230,19 +187,27 @@ export class ClaudeChannelSelectorService {
         lastErrorAt: new Date(),
       },
     });
+
+    // 从缓存池中移除该渠道
+    this.channelPoolCache.markChannelUnavailable(channelId);
+    this.logger.log(`Channel ${channelId} marked as error and removed from cache`);
   }
 
   /**
    * 恢复渠道为正常状态
    */
   async restoreChannel(channelId: string) {
-    await this.prisma.channel.update({
+    const channel = await this.prisma.channel.update({
       where: { id: channelId },
       data: {
         status: ChannelStatus.ACTIVE,
         rateLimitEndAt: null,
       },
     });
+
+    // 将渠道重新加入缓存池
+    this.channelPoolCache.upsertChannel(channel);
+    this.logger.log(`Channel ${channelId} restored and added back to cache`);
   }
 
   /**

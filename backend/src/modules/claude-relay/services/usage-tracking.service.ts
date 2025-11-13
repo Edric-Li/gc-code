@@ -1,19 +1,24 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../common/prisma.service';
 import { Prisma } from '@prisma/client';
+import { UsageQueueService, UsageRecord } from './usage-queue.service';
 
 /**
  * API Key 用量追踪服务
  * 负责记录和聚合 API Key 的使用情况
+ * 使用批量队列优化性能
  */
 @Injectable()
 export class UsageTrackingService {
   private readonly logger = new Logger(UsageTrackingService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private usageQueue: UsageQueueService
+  ) {}
 
   /**
-   * 记录API请求用量
+   * 记录API请求用量（使用批量队列）
    * @param apiKeyId API Key ID
    * @param userId 用户 ID
    * @param inputTokens 输入Token数
@@ -32,51 +37,28 @@ export class UsageTrackingService {
     const { apiKeyId, userId, inputTokens, outputTokens, success, cost = 0 } = params;
 
     try {
-      // 计算当前时间的周期（按天聚合）
-      const now = new Date();
-      const periodStart = this.getDayStart(now);
-      const periodEnd = this.getDayEnd(now);
-
       const totalTokens = inputTokens + outputTokens;
 
-      // 使用 upsert 来原子更新或创建记录
-      await this.prisma.apiKeyUsage.upsert({
-        where: {
-          keyId_periodStart: {
-            keyId: apiKeyId,
-            periodStart,
-          },
-        },
-        update: {
-          requestCount: { increment: 1 },
-          successCount: success ? { increment: 1 } : undefined,
-          failureCount: !success ? { increment: 1 } : undefined,
-          tokensUsed: { increment: totalTokens },
-          cost: { increment: new Prisma.Decimal(cost) },
-          updatedAt: new Date(),
-        },
-        create: {
-          keyId: apiKeyId,
-          userId,
-          requestCount: 1,
-          successCount: success ? 1 : 0,
-          failureCount: !success ? 1 : 0,
-          tokensUsed: totalTokens,
-          cost: new Prisma.Decimal(cost),
-          periodStart,
-          periodEnd,
-          metadata: {
-            firstRequest: now.toISOString(),
-          },
-        },
-      });
+      // 构建用量记录
+      const usageRecord: UsageRecord = {
+        apiKeyId,
+        userId,
+        inputTokens,
+        outputTokens,
+        success,
+        cost,
+        timestamp: new Date(),
+      };
 
-      this.logger.log(
-        `Recorded usage for API Key ${apiKeyId}: ${totalTokens} tokens (${inputTokens} in + ${outputTokens} out), success: ${success}`
+      // 入队（异步批量写入，不阻塞）
+      await this.usageQueue.enqueue(usageRecord);
+
+      this.logger.debug(
+        `Enqueued usage for API Key ${apiKeyId.substring(0, 8)}...: ${totalTokens} tokens, success: ${success}`
       );
     } catch (error) {
       // 记录失败不应该影响主流程
-      this.logger.error(`Failed to record usage: ${error.message}`, error.stack);
+      this.logger.error(`Failed to enqueue usage: ${error.message}`);
     }
   }
 

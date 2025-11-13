@@ -10,6 +10,10 @@ import { ClaudeRelayController } from './claude-relay.controller';
 import { ApiKeyAuthGuard } from './guards/api-key-auth.guard';
 import { PrismaService } from '../../common/prisma.service';
 import { SESSION_STORAGE_SERVICE } from './constants';
+// 新增性能优化服务
+import { ApiKeyCacheService } from './services/api-key-cache.service';
+import { ChannelPoolCacheService } from './services/channel-pool-cache.service';
+import { UsageQueueService } from './services/usage-queue.service';
 
 @Module({
   imports: [
@@ -29,6 +33,10 @@ import { SESSION_STORAGE_SERVICE } from './constants';
       provide: SESSION_STORAGE_SERVICE,
       useClass: MemorySessionStorageService,
     },
+    // 🚀 性能优化服务
+    ApiKeyCacheService, // API Key 内存缓存
+    ChannelPoolCacheService, // 渠道池内存缓存
+    UsageQueueService, // 用量统计批量队列
     ClaudeChannelSelectorService,
     ClaudeProxyService,
     UsageTrackingService,
@@ -39,6 +47,9 @@ import { SESSION_STORAGE_SERVICE } from './constants';
     SESSION_STORAGE_SERVICE,
     ClaudeChannelSelectorService,
     ClaudeProxyService,
+    ApiKeyCacheService,
+    ChannelPoolCacheService,
+    UsageQueueService,
   ],
 })
 export class ClaudeRelayModule {}

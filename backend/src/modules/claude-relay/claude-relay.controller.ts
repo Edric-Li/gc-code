@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
   Headers,
   UseGuards,
@@ -8,6 +9,7 @@ import {
   Res,
   HttpStatus,
   Logger,
+  SetMetadata,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { ClaudeProxyService } from './services/claude-proxy.service';
@@ -18,6 +20,9 @@ import {
   ApiKeyInfo,
   ClaudeMessagesResponse,
 } from './interfaces/claude-api.interface';
+import { ApiKeyCacheService } from './services/api-key-cache.service';
+import { ChannelPoolCacheService } from './services/channel-pool-cache.service';
+import { UsageQueueService } from './services/usage-queue.service';
 
 /**
  * Claude API 中继 Controller
@@ -30,7 +35,10 @@ export class ClaudeRelayController {
 
   constructor(
     private proxyService: ClaudeProxyService,
-    private usageTracking: UsageTrackingService
+    private usageTracking: UsageTrackingService,
+    private apiKeyCache: ApiKeyCacheService,
+    private channelPoolCache: ChannelPoolCacheService,
+    private usageQueue: UsageQueueService
   ) {}
 
   /**
@@ -196,5 +204,21 @@ export class ClaudeRelayController {
     ];
 
     return forwardHeaders.includes(headerName.toLowerCase());
+  }
+
+  /**
+   * GET /v1/stats
+   * 获取缓存和队列统计信息（用于监控）
+   * 公开端点，无需 API Key
+   */
+  @Get('stats')
+  @SetMetadata('isPublic', true)
+  async getStats() {
+    return {
+      timestamp: new Date().toISOString(),
+      apiKeyCache: this.apiKeyCache.getStats(),
+      channelPool: this.channelPoolCache.getStats(),
+      usageQueue: this.usageQueue.getStats(),
+    };
   }
 }
