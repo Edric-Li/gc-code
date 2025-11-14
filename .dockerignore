@@ -54,9 +54,5 @@ Dockerfile
 docker-compose.yml
 .dockerignore
 
-# 开发日志（只排除日志文件，不排除包含 log 的源代码文件）
-**/*.log
-!backend/src/**/*.ts
-
 # 数据文件
 backend/data
