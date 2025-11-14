@@ -304,7 +304,7 @@ export default function Organizations() {
             </div>
           </div>
 
-          {hasChildren && isExpanded && (
+          {hasChildren && isExpanded && org.children && (
             <div>{renderOrganizationTree(org.children, level + 1)}</div>
           )}
         </div>

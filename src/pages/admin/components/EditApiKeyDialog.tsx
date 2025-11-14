@@ -3,6 +3,7 @@ import { X, AlertCircle } from 'lucide-react';
 import type { ApiKey, UpdateApiKeyDto } from '@/types/apiKey';
 import { channelApi } from '@/services/channelApi';
 import type { Channel } from '@/types/channel';
+import { ChannelStatus } from '@/types/channel';
 
 interface EditApiKeyDialogProps {
   apiKey: ApiKey;
@@ -30,7 +31,7 @@ export default function EditApiKeyDialog({ apiKey, onClose, onUpdate }: EditApiK
   const loadChannels = async () => {
     try {
       setLoadingChannels(true);
-      const response = await channelApi.list({ status: 'ACTIVE', limit: 100 });
+      const response = await channelApi.list({ status: ChannelStatus.ACTIVE, limit: 100 });
       setChannels(response.data);
     } catch (_err) {
       // Silently fail - channel selection is optional

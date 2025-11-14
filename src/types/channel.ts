@@ -29,6 +29,8 @@ export interface Channel {
   lastHealthCheck?: string;
   errorCount: number;
   lastError?: string;
+  priority?: number;
+  weight?: number;
   metadata?: Record<string, unknown>;
   models?: ChannelModel[];
   provider: {

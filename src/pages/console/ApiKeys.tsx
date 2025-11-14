@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Copy, Trash2, Ban, Check } from 'lucide-react';
 import { apiKeyApi } from '@/services/apiKeyApi';
 import type { ApiKey } from '@/types/apiKey';
+import { KeyStatus } from '@/types/apiKey';
 import { siteConfig } from '@/config/site';
 import { checkMyApiKeyNameAvailable } from '@/utils/apiKeyValidation';
 

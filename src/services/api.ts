@@ -34,10 +34,10 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
 
     try {
       errorDetails = await response.json();
-      errorMessage = errorDetails.message || errorDetails.error || errorMessage;
+      errorMessage = errorDetails?.message || errorDetails?.error || errorMessage;
 
       // 如果有验证错误，提取详细信息
-      if (errorDetails.errors && Array.isArray(errorDetails.errors)) {
+      if (errorDetails?.errors && Array.isArray(errorDetails.errors)) {
         errorMessage = errorDetails.errors
           .map((e) => (typeof e === 'string' ? e : e.message || ''))
           .join(', ');

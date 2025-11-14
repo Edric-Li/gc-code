@@ -117,18 +117,6 @@ export default function Dashboard() {
     }
   };
 
-  const getPeriodText = () => {
-    if (dateRange === 'today') return '今天';
-    if (dateRange === '7d') return '最近7天';
-    if (dateRange === '30d') return '最近30天';
-    if (dateRange === 'custom' && customStartDate && customEndDate) {
-      return `${customStartDate} 至 ${customEndDate}`;
-    }
-    return '自定义';
-  };
-
-  const periodText = getPeriodText();
-
   const handleDateRangeChange = (range: DateRangeType) => {
     if (range === 'custom') {
       setShowCustomPicker(true);
@@ -439,13 +427,14 @@ export default function Dashboard() {
                         const color = CHART_COLORS[index % CHART_COLORS.length];
 
                         return (
-                          <path
-                            key={index}
-                            d={pathData}
-                            fill={color.fill}
-                            className="transition-opacity hover:opacity-80 cursor-pointer"
-                            title={`${model.model}: ${percentage.toFixed(1)}%`}
-                          />
+                          <g key={index}>
+                            <title>{`${model.model}: ${percentage.toFixed(1)}%`}</title>
+                            <path
+                              d={pathData}
+                              fill={color.fill}
+                              className="transition-opacity hover:opacity-80 cursor-pointer"
+                            />
+                          </g>
                         );
                       });
                     })()}

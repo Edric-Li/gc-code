@@ -4,6 +4,7 @@ import type { CreateApiKeyDto } from '@/types/apiKey';
 import { userApi, type SimpleUser } from '@/services/userApi';
 import { channelApi } from '@/services/channelApi';
 import type { Channel } from '@/types/channel';
+import { ChannelStatus } from '@/types/channel';
 import { checkApiKeyNameAvailable } from '@/utils/apiKeyValidation';
 
 interface CreateApiKeyDialogProps {
@@ -47,7 +48,7 @@ export default function CreateApiKeyDialog({ onClose, onCreate }: CreateApiKeyDi
   const loadChannels = async () => {
     try {
       setLoadingChannels(true);
-      const response = await channelApi.list({ status: 'ACTIVE', limit: 100 });
+      const response = await channelApi.list({ status: ChannelStatus.ACTIVE, limit: 100 });
       setChannels(response.data);
     } catch {
       // Silently fail - channel selection is optional

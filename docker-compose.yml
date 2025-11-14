@@ -1,9 +1,57 @@
-version: '3.8'
-
 services:
+  # 前后端应用
   web:
-    image: edricli7/gc-code-portal:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: gc-code-portal
     ports:
       - "80:80"
+    # 使用 host 网络模式访问本机数据库
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      # 数据库配置 - 使用本机数据库
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@host.docker.internal:5432/gc_code_portal}
+
+      # 加密密钥（必需）
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+
+      # JWT 配置
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+
+      # Azure AD 配置
+      AZURE_AD_CLIENT_ID: ${AZURE_AD_CLIENT_ID}
+      AZURE_AD_TENANT_ID: ${AZURE_AD_TENANT_ID}
+      AZURE_AD_CLIENT_SECRET: ${AZURE_AD_CLIENT_SECRET}
+      AZURE_AD_REDIRECT_URI: ${AZURE_AD_REDIRECT_URI:-http://localhost/api/auth/azure/callback}
+
+      # 外部中继服务配置
+      RELAY_API_BASE_URL: ${RELAY_API_BASE_URL:-https://console.gccode.cn}
+      RELAY_API_USERNAME: ${RELAY_API_USERNAME}
+      RELAY_API_PASSWORD: ${RELAY_API_PASSWORD}
+
+      # Session 配置
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-3600}
+      SESSION_RENEW_THRESHOLD_SECONDS: ${SESSION_RENEW_THRESHOLD_SECONDS:-300}
+      SESSION_MAX_CACHE_SIZE: ${SESSION_MAX_CACHE_SIZE:-10000}
+      SESSION_MESSAGE_COUNT: ${SESSION_MESSAGE_COUNT:-3}
+      SESSION_INCLUDE_SYSTEM_PROMPT: ${SESSION_INCLUDE_SYSTEM_PROMPT:-false}
+
+      # 渠道测试连接配置
+      DEFAULT_TEST_MODEL: ${DEFAULT_TEST_MODEL:-claude-3-5-haiku-20241022}
+      TEST_CONNECTION_TIMEOUT: ${TEST_CONNECTION_TIMEOUT:-30000}
+
+      # 应用配置
+      NODE_ENV: production
+      PORT: 5555
+      API_PREFIX: /api
+      FRONTEND_URL: http://localhost
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

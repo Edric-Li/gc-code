@@ -97,13 +97,15 @@ export default function AdminLayout() {
           <div className="border-t border-gray-200 dark:border-gray-700 p-4">
             <div className="flex items-center mb-3">
               <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
-                {user.displayName?.charAt(0) || user.email.charAt(0).toUpperCase()}
+                {user?.displayName?.charAt(0) || user?.email?.charAt(0)?.toUpperCase() || 'U'}
               </div>
               <div className="ml-3 flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                  {user.displayName || user.username}
+                  {user?.displayName || user?.username || 'User'}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                  {user?.email || ''}
+                </p>
               </div>
             </div>
             <button

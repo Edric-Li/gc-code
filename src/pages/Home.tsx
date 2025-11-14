@@ -9,7 +9,6 @@ import {
   TrendingUp,
   Clock,
   LayoutDashboard,
-  Settings,
 } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
 import { siteConfig } from '@/config/site';

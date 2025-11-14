@@ -1,6 +1,6 @@
 import { Helmet } from 'react-helmet-async';
 import { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, Clock, DollarSign, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle, XCircle, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { Pagination } from '@/components/ui/Pagination';
 import { apiKeyApi } from '@/services/apiKeyApi';
@@ -42,6 +42,13 @@ interface LogsResponse {
   page: number;
   limit: number;
   pages: number;
+}
+
+// 类型守卫函数
+function isLogsResponse(value: unknown): value is LogsResponse {
+  if (typeof value !== 'object' || value === null) return false;
+  const obj = value as Record<string, unknown>;
+  return Array.isArray(obj.logs) && typeof obj.total === 'number' && typeof obj.pages === 'number';
 }
 
 export default function Logs() {
@@ -97,15 +104,10 @@ export default function Logs() {
       });
 
       // 检查响应格式
-      if (response && typeof response === 'object') {
-        const typedResponse = response as LogsResponse;
-        const logs = typedResponse.logs || [];
-        const total = typedResponse.total || 0;
-        const pages = typedResponse.pages || 1;
-
-        setLogs(logs);
-        setTotal(total);
-        setTotalPages(pages);
+      if (isLogsResponse(response)) {
+        setLogs(response.logs);
+        setTotal(response.total);
+        setTotalPages(response.pages);
       } else {
         console.error('无效的响应格式:', response);
         setLogs([]);

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, type ReactElement, type ReactNode } from 'react';
 import { Search, Plus, Edit, Trash2, Zap, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 import { channelApi } from '@/services/channelApi';
 import type {
@@ -10,6 +10,30 @@ import type {
 } from '@/types/channel';
 import CreateChannelDialog from './components/CreateChannelDialog';
 import EditChannelDialog from './components/EditChannelDialog';
+
+// 测试结果数据类型定义
+interface TestResultError {
+  message?: string;
+  type?: string;
+}
+
+interface TestResultContent {
+  text: string;
+  type?: string;
+}
+
+interface TestResultUsage {
+  input_tokens: number;
+  output_tokens: number;
+}
+
+interface TestResultData {
+  content?: TestResultContent[];
+  model?: string;
+  stop_reason?: string;
+  usage?: TestResultUsage;
+  error?: TestResultError | string;
+}
 
 export default function Channels() {
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -103,10 +127,12 @@ export default function Channels() {
         if (result.data) {
           try {
             if (typeof result.data === 'object') {
+              const data = result.data as TestResultData;
               // 检查是否有错误消息
-              if (result.data.error) {
-                const errorMsg = result.data.error.message || result.data.error;
-                const errorType = result.data.error.type || '';
+              if (data.error) {
+                const errorMsg =
+                  typeof data.error === 'string' ? data.error : data.error.message || '';
+                const errorType = typeof data.error === 'object' ? data.error.type || '' : '';
                 errorInfo = `\n\n错误详情: ${errorMsg}`;
                 if (errorType) {
                   errorInfo += ` (类型: ${errorType})`;
@@ -156,6 +182,88 @@ export default function Channels() {
       default:
         return <AlertTriangle className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />;
     }
+  };
+
+  const renderLatency = (latency?: number): ReactNode => {
+    if (latency == null) return null;
+    return (
+      <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">响应延迟</span>
+        <span
+          className={`text-sm font-semibold ${latency < 1000 ? 'text-green-600 dark:text-green-400' : latency < 3000 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}
+        >
+          {latency}ms
+        </span>
+      </div>
+    );
+  };
+
+  const renderTestResultData = (data: unknown): ReactElement => {
+    const typedData = data as TestResultData;
+    if (typedData.content?.[0]?.text) {
+      return (
+        <div className="space-y-3">
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <div className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">AI 响应</div>
+            <div className="text-sm text-blue-800 dark:text-blue-200 font-mono whitespace-pre-wrap">
+              "{typedData.content[0].text}"
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">模型</div>
+              <div className="text-sm font-medium text-gray-900 dark:text-white">
+                {typedData.model}
+              </div>
+            </div>
+            <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">停止原因</div>
+              <div className="text-sm font-medium text-gray-900 dark:text-white">
+                {typedData.stop_reason}
+              </div>
+            </div>
+          </div>
+
+          {typedData.usage && (
+            <div className="p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+              <div className="text-sm font-medium text-purple-900 dark:text-purple-100 mb-3">
+                Token 使用统计
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="text-center">
+                  <div className="text-xs text-purple-600 dark:text-purple-400 mb-1">输入</div>
+                  <div className="text-lg font-bold text-purple-900 dark:text-purple-100">
+                    {typedData.usage.input_tokens}
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-xs text-purple-600 dark:text-purple-400 mb-1">输出</div>
+                  <div className="text-lg font-bold text-purple-900 dark:text-purple-100">
+                    {typedData.usage.output_tokens}
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-xs text-purple-600 dark:text-purple-400 mb-1">总计</div>
+                  <div className="text-lg font-bold text-purple-900 dark:text-purple-100">
+                    {(typedData.usage.input_tokens || 0) + (typedData.usage.output_tokens || 0)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Raw JSON fallback
+    return (
+      <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg overflow-x-auto">
+        <pre className="text-xs text-gray-700 dark:text-gray-300 font-mono whitespace-pre-wrap">
+          {JSON.stringify(data, null, 2)}
+        </pre>
+      </div>
+    );
   };
 
   const totalPages = Math.ceil(total / limit);
@@ -386,7 +494,7 @@ export default function Channels() {
         />
       )}
 
-      {testResult && (
+      {testResult ? (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
             {/* Header */}
@@ -436,102 +544,17 @@ export default function Channels() {
             {/* Body */}
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
               {/* Latency */}
-              {testResult.latency !== undefined && (
-                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    响应延迟
-                  </span>
-                  <span
-                    className={`text-sm font-semibold ${testResult.latency < 1000 ? 'text-green-600 dark:text-green-400' : testResult.latency < 3000 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}
-                  >
-                    {testResult.latency}ms
-                  </span>
-                </div>
-              )}
+              {renderLatency(testResult.latency as number | undefined)}
 
               {/* Response Data */}
-              {testResult.data && (
+              {testResult.data ? (
                 <div className="space-y-2">
                   <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
                     API 响应数据
                   </h4>
-
-                  {/* Anthropic format */}
-                  {testResult.data.content && testResult.data.content[0]?.text && (
-                    <div className="space-y-3">
-                      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                        <div className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
-                          AI 响应
-                        </div>
-                        <div className="text-sm text-blue-800 dark:text-blue-200 font-mono whitespace-pre-wrap">
-                          "{testResult.data.content[0].text}"
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">模型</div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {testResult.data.model}
-                          </div>
-                        </div>
-                        <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                            停止原因
-                          </div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {testResult.data.stop_reason}
-                          </div>
-                        </div>
-                      </div>
-
-                      {testResult.data.usage && (
-                        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
-                          <div className="text-sm font-medium text-purple-900 dark:text-purple-100 mb-3">
-                            Token 使用统计
-                          </div>
-                          <div className="grid grid-cols-3 gap-3">
-                            <div className="text-center">
-                              <div className="text-xs text-purple-600 dark:text-purple-400 mb-1">
-                                输入
-                              </div>
-                              <div className="text-lg font-bold text-purple-900 dark:text-purple-100">
-                                {testResult.data.usage.input_tokens}
-                              </div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-xs text-purple-600 dark:text-purple-400 mb-1">
-                                输出
-                              </div>
-                              <div className="text-lg font-bold text-purple-900 dark:text-purple-100">
-                                {testResult.data.usage.output_tokens}
-                              </div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-xs text-purple-600 dark:text-purple-400 mb-1">
-                                总计
-                              </div>
-                              <div className="text-lg font-bold text-purple-900 dark:text-purple-100">
-                                {(testResult.data.usage.input_tokens || 0) +
-                                  (testResult.data.usage.output_tokens || 0)}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Raw JSON fallback - 当不是 Anthropic 格式时显示原始 JSON */}
-                  {!testResult.data.content && (
-                    <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg overflow-x-auto">
-                      <pre className="text-xs text-gray-700 dark:text-gray-300 font-mono whitespace-pre-wrap">
-                        {JSON.stringify(testResult.data, null, 2)}
-                      </pre>
-                    </div>
-                  )}
+                  {renderTestResultData(testResult.data)}
                 </div>
-              )}
+              ) : null}
             </div>
 
             {/* Footer */}
@@ -545,7 +568,7 @@ export default function Channels() {
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

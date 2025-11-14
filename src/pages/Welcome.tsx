@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import Logo from '@/components/common/Logo';
 import { Loader2 } from 'lucide-react';
 
 export default function Welcome() {

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle, XCircle, Clock, DollarSign, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle, XCircle, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { Pagination } from '@/components/ui/Pagination';
 import { logApi, type LoginLog, type AuditLog, type ApiLog } from '@/services/logApi';
 import { apiKeyApi } from '@/services/apiKeyApi';
+import type { ApiKey } from '@/types/apiKey';
 
 type LogType = 'login' | 'audit' | 'api' | 'apikey-usage';
 
@@ -56,14 +57,13 @@ export default function Logs() {
 function LoginLogsList() {
   const [logs, setLogs] = useState<LoginLog[]>([]);
   const [loading, setLoading] = useState(false);
-  const [page, setPage] = useState(0);
   const pageSize = 20;
 
   const loadLogs = async () => {
     try {
       setLoading(true);
       const response = await logApi.getLoginLogs({
-        skip: page * pageSize,
+        skip: 0,
         take: pageSize,
       });
       setLogs(response.data);
@@ -76,8 +76,7 @@ function LoginLogsList() {
 
   useEffect(() => {
     loadLogs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+  }, []);
 
   if (loading && logs.length === 0) {
     return <div className="text-center py-8 text-gray-600 dark:text-gray-400">加载中...</div>;
@@ -144,14 +143,13 @@ function LoginLogsList() {
 function AuditLogsList() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(false);
-  const [page, setPage] = useState(0);
   const pageSize = 20;
 
   const loadLogs = async () => {
     try {
       setLoading(true);
       const response = await logApi.getAuditLogs({
-        skip: page * pageSize,
+        skip: 0,
         take: pageSize,
       });
       setLogs(response.data);
@@ -164,8 +162,7 @@ function AuditLogsList() {
 
   useEffect(() => {
     loadLogs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+  }, []);
 
   if (loading && logs.length === 0) {
     return <div className="text-center py-8 text-gray-600 dark:text-gray-400">加载中...</div>;
@@ -240,14 +237,13 @@ function AuditLogsList() {
 function ApiLogsList() {
   const [logs, setLogs] = useState<ApiLog[]>([]);
   const [loading, setLoading] = useState(false);
-  const [page, setPage] = useState(0);
   const pageSize = 20;
 
   const loadLogs = async () => {
     try {
       setLoading(true);
       const response = await logApi.getApiLogs({
-        skip: page * pageSize,
+        skip: 0,
         take: pageSize,
       });
       setLogs(response.data);
@@ -260,8 +256,7 @@ function ApiLogsList() {
 
   useEffect(() => {
     loadLogs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+  }, []);
 
   if (loading && logs.length === 0) {
     return <div className="text-center py-8 text-gray-600 dark:text-gray-400">加载中...</div>;
@@ -378,7 +373,7 @@ interface RequestLog {
 // API Key 使用日志列表
 function ApiKeyRequestLogsList() {
   const [logs, setLogs] = useState<RequestLog[]>([]);
-  const [apiKeys, setApiKeys] = useState<Array<Record<string, unknown>>>([]);
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [models, setModels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedApiKeyIds, setSelectedApiKeyIds] = useState<string[]>([]);
