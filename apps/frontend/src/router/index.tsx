@@ -28,6 +28,8 @@ const Logs = lazy(() => import('@/pages/admin/Logs'));
 const ApiKeys = lazy(() => import('@/pages/admin/ApiKeys'));
 const AiProviders = lazy(() => import('@/pages/admin/AiProviders'));
 const Channels = lazy(() => import('@/pages/admin/Channels'));
+const NotificationSettings = lazy(() => import('@/pages/admin/NotificationSettings'));
+const AlertHistory = lazy(() => import('@/pages/admin/AlertHistory'));
 
 function AppRouter() {
   return (
@@ -109,6 +111,8 @@ function AppRouter() {
           <Route path="api-keys" element={<ApiKeys />} />
           <Route path="ai-providers" element={<AiProviders />} />
           <Route path="channels" element={<Channels />} />
+          <Route path="notifications" element={<NotificationSettings />} />
+          <Route path="alerts" element={<AlertHistory />} />
         </Route>
 
         {/* 404 page */}

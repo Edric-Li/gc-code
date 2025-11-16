@@ -20,6 +20,7 @@ import { RequestLogCleanupService } from './services/request-log-cleanup.service
 import { PricingService } from './services/pricing.service';
 import { ChannelErrorTrackerService } from './services/channel-error-tracker.service';
 import { ChannelAutoRecoveryService } from './services/channel-auto-recovery.service';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { ChannelAutoRecoveryService } from './services/channel-auto-recovery.ser
       timeout: 300000, // 5分钟超时
       maxRedirects: 5,
     }),
+    NotificationModule, // 导入通知模块
   ],
   controllers: [ClaudeRelayController],
   providers: [

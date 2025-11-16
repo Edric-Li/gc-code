@@ -11,6 +11,7 @@ import { AiProvidersModule } from './modules/ai-providers/ai-providers.module';
 import { ChannelsModule } from './modules/channels/channels.module';
 import { ClaudeRelayModule } from './modules/claude-relay/claude-relay.module';
 import { ApiLogMiddleware } from './modules/logs/api-log.middleware';
+import { NotificationModule } from './modules/notification/notification.module';
 
 @Module({
   imports: [
@@ -49,6 +50,9 @@ import { ApiLogMiddleware } from './modules/logs/api-log.middleware';
 
     // Claude Relay 模块（Sticky Session）
     ClaudeRelayModule,
+
+    // 通知模块（邮件告警）
+    NotificationModule,
   ],
   controllers: [],
   providers: [],

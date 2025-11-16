@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../../common/prisma.service';
-import { ChannelStatus } from '@prisma/client';
+import { ChannelStatus, AlertType } from '@prisma/client';
 import { ChannelPoolCacheService } from './channel-pool-cache.service';
 import { ChannelErrorTrackerService } from './channel-error-tracker.service';
+import { ChannelAlertService } from '../../notification/services/channel-alert.service';
 
 /**
  * 渠道自动恢复服务
@@ -12,6 +13,7 @@ import { ChannelErrorTrackerService } from './channel-error-tracker.service';
  * - 定时检查 TEMP_ERROR 状态的渠道
  * - 5分钟后自动恢复为 ACTIVE 状态
  * - 刷新渠道池缓存
+ * - 发送恢复通知
  */
 @Injectable()
 export class ChannelAutoRecoveryService {
@@ -23,7 +25,8 @@ export class ChannelAutoRecoveryService {
   constructor(
     private prisma: PrismaService,
     private channelPoolCache: ChannelPoolCacheService,
-    private errorTracker: ChannelErrorTrackerService
+    private errorTracker: ChannelErrorTrackerService,
+    private alertService: ChannelAlertService
   ) {}
 
   /**
@@ -53,9 +56,7 @@ export class ChannelAutoRecoveryService {
         return;
       }
 
-      this.logger.log(
-        `Found ${channelsToRecover.length} channels to recover from TEMP_ERROR`
-      );
+      this.logger.log(`Found ${channelsToRecover.length} channels to recover from TEMP_ERROR`);
 
       // 批量恢复渠道
       for (const channel of channelsToRecover) {
@@ -95,6 +96,9 @@ export class ChannelAutoRecoveryService {
       this.logger.log(
         `✅ Channel ${channelName} (${channelId}) auto-recovered from TEMP_ERROR to ACTIVE`
       );
+
+      // 发送恢复通知
+      await this.alertService.sendAlert(channel, AlertType.RECOVERED);
     } catch (error) {
       this.logger.error(
         `Failed to recover channel ${channelName} (${channelId}): ${error.message}`
