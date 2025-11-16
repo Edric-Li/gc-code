@@ -1,5 +1,21 @@
 {
-  "*.{js,jsx,ts,tsx}": ["eslint --fix", "prettier --write"],
-  "*.{css,scss}": ["stylelint --fix", "prettier --write"],
-  "*.{json,md}": ["prettier --write"]
+  "apps/frontend/**/*.{js,jsx,ts,tsx}": [
+    "pnpm --filter @gc-code/frontend exec eslint --fix",
+    "pnpm --filter @gc-code/frontend exec prettier --write"
+  ],
+  "apps/frontend/**/*.{css,scss}": [
+    "pnpm --filter @gc-code/frontend exec stylelint --fix",
+    "pnpm --filter @gc-code/frontend exec prettier --write"
+  ],
+  "apps/frontend/**/*.{json,md}": [
+    "pnpm --filter @gc-code/frontend exec prettier --write"
+  ],
+  "apps/backend/**/*.{ts,js}": [
+    "pnpm --filter @gc-code/backend exec eslint --fix",
+    "pnpm --filter @gc-code/backend exec prettier --write"
+  ],
+  "apps/backend/**/*.{json,md}": [
+    "pnpm --filter @gc-code/backend exec prettier --write"
+  ],
+  "*.{json,md,yaml,yml}": ["prettier --write --ignore-unknown"]
 }
