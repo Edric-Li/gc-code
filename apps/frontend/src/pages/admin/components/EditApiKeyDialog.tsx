@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import type { ApiKey, UpdateApiKeyDto } from '@/types/apiKey';
+import { ChannelTargetType } from '@/types/apiKey';
 import { channelApi } from '@/services/channelApi';
 import type { Channel } from '@/types/channel';
 import { ChannelStatus } from '@/types/channel';
+import { aiProviderApi } from '@/services/aiProviderApi';
+import type { AiProvider } from '@/types/aiProvider';
 
 interface EditApiKeyDialogProps {
   apiKey: ApiKey;
@@ -17,15 +20,20 @@ export default function EditApiKeyDialog({ apiKey, onClose, onUpdate }: EditApiK
     description: apiKey.description,
     expiresAt: apiKey.expiresAt ? new Date(apiKey.expiresAt).toISOString().slice(0, 16) : '',
     dailyCostLimit: apiKey.dailyCostLimit,
+    channelTargetType: apiKey.channelTargetType || ChannelTargetType.CHANNEL,
     channelId: apiKey.channelId || '',
+    providerId: apiKey.providerId || '',
   });
   const [channels, setChannels] = useState<Channel[]>([]);
+  const [providers, setProviders] = useState<AiProvider[]>([]);
   const [loadingChannels, setLoadingChannels] = useState(false);
+  const [loadingProviders, setLoadingProviders] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     loadChannels();
+    loadProviders();
   }, []);
 
   const loadChannels = async () => {
@@ -37,6 +45,18 @@ export default function EditApiKeyDialog({ apiKey, onClose, onUpdate }: EditApiK
       // Silently fail - channel selection is optional
     } finally {
       setLoadingChannels(false);
+    }
+  };
+
+  const loadProviders = async () => {
+    try {
+      setLoadingProviders(true);
+      const response = await aiProviderApi.list({ isActive: true, limit: 100 });
+      setProviders(response.data);
+    } catch {
+      // Silently fail - provider selection is optional
+    } finally {
+      setLoadingProviders(false);
     }
   };
 
@@ -64,8 +84,19 @@ export default function EditApiKeyDialog({ apiKey, onClose, onUpdate }: EditApiK
         cleanData.dailyCostLimit = formData.dailyCostLimit;
       }
 
-      if (formData.channelId !== apiKey.channelId) {
-        cleanData.channelId = formData.channelId || undefined;
+      // 渠道目标类型和相关字段
+      if (formData.channelTargetType !== apiKey.channelTargetType) {
+        cleanData.channelTargetType = formData.channelTargetType;
+      }
+
+      if (formData.channelTargetType === ChannelTargetType.CHANNEL) {
+        if (formData.channelId !== apiKey.channelId) {
+          cleanData.channelId = formData.channelId || undefined;
+        }
+      } else if (formData.channelTargetType === ChannelTargetType.PROVIDER) {
+        if (formData.providerId !== apiKey.providerId) {
+          cleanData.providerId = formData.providerId || undefined;
+        }
       }
 
       await onUpdate(apiKey.id, cleanData);
@@ -153,33 +184,84 @@ export default function EditApiKeyDialog({ apiKey, onClose, onUpdate }: EditApiK
             />
           </div>
 
-          {/* Channel Selection */}
+          {/* Channel Target Type Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              绑定渠道
+              渠道目标类型
             </label>
             <select
-              value={formData.channelId}
-              onChange={(e) => setFormData({ ...formData, channelId: e.target.value })}
-              disabled={loadingChannels}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+              value={formData.channelTargetType}
+              onChange={(e) =>
+                setFormData({ ...formData, channelTargetType: e.target.value as ChannelTargetType })
+              }
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
-              <option value="">自动选择可用渠道</option>
-              {channels.map((channel) => (
-                <option key={channel.id} value={channel.id}>
-                  {channel.name} ({channel.provider.name})
-                </option>
-              ))}
+              <option value={ChannelTargetType.CHANNEL}>具体渠道</option>
+              <option value={ChannelTargetType.PROVIDER}>AI供货商</option>
             </select>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {apiKey.channel && (
-                <span>
-                  当前绑定: {apiKey.channel.name} ({apiKey.channel.provider.name})<br />
-                </span>
-              )}
-              留空表示自动从可用渠道中选择
-            </p>
           </div>
+
+          {/* Channel Selection (when CHANNEL is selected) */}
+          {formData.channelTargetType === ChannelTargetType.CHANNEL && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                绑定渠道
+              </label>
+              <select
+                value={formData.channelId}
+                onChange={(e) => setFormData({ ...formData, channelId: e.target.value })}
+                disabled={loadingChannels}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+              >
+                <option value="">自动选择可用渠道</option>
+                {channels.map((channel) => (
+                  <option key={channel.id} value={channel.id}>
+                    {channel.name} ({channel.provider.name})
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {apiKey.channel && (
+                  <span>
+                    当前绑定: {apiKey.channel.name} ({apiKey.channel.provider.name})
+                    <br />
+                  </span>
+                )}
+                留空表示自动从可用渠道中选择
+              </p>
+            </div>
+          )}
+
+          {/* Provider Selection (when PROVIDER is selected) */}
+          {formData.channelTargetType === ChannelTargetType.PROVIDER && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                AI供货商
+              </label>
+              <select
+                value={formData.providerId}
+                onChange={(e) => setFormData({ ...formData, providerId: e.target.value })}
+                disabled={loadingProviders}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+              >
+                <option value="">请选择供货商</option>
+                {providers.map((provider) => (
+                  <option key={provider.id} value={provider.id}>
+                    {provider.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {apiKey.provider && (
+                  <span>
+                    当前绑定: {apiKey.provider.name}
+                    <br />
+                  </span>
+                )}
+                系统会使用 LRU 算法从该供货商的渠道中选择
+              </p>
+            </div>
+          )}
 
           <div className="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
             <button

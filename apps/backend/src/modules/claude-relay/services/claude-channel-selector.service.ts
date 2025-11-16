@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, Logger, Inject } from '@nestjs/common';
 import { PrismaService } from '../../../common/prisma.service';
-import { Channel, ChannelStatus } from '@prisma/client';
+import { Channel, ChannelStatus, ChannelTargetType } from '@prisma/client';
 import { SessionHashService } from './session-hash.service';
 import { ISessionStorageService } from './session-storage/session-storage.interface';
 import { SESSION_STORAGE_SERVICE } from '../constants';
@@ -25,9 +25,20 @@ export class ClaudeChannelSelectorService {
     // 1. 生成会话哈希
     const sessionHash = this.generateSessionHash(requestBody);
 
-    // 2. 如果有会话哈希，尝试使用 Sticky Session
+    // 2. 获取候选渠道列表（用于验证粘性会话）
+    const candidateChannels = await this.getCandidateChannels(apiKey);
+
+    if (candidateChannels.length === 0) {
+      throw new BadRequestException('No available channels for this API Key');
+    }
+
+    // 3. 如果有会话哈希，尝试使用 Sticky Session
     if (sessionHash) {
-      const stickyChannel = await this.tryGetStickyChannel(sessionHash, apiKey.id);
+      const stickyChannel = await this.tryGetStickyChannel(
+        sessionHash,
+        apiKey.id,
+        candidateChannels
+      );
 
       if (stickyChannel) {
         this.logger.log(`✅ Sticky session hit: ${sessionHash} → ${stickyChannel.name}`);
@@ -38,18 +49,38 @@ export class ClaudeChannelSelectorService {
         // 自动续期
         await this.sessionStorage.renewMapping(sessionHash);
 
+        // 异步更新最后使用时间
+        this.prisma.channel
+          .update({
+            where: { id: stickyChannel.id },
+            data: { lastUsedAt: new Date() },
+          })
+          .catch((error) => {
+            this.logger.error(`Failed to update channel lastUsedAt: ${error.message}`);
+          });
+
         return stickyChannel;
       }
     }
 
-    // 3. 没有 Sticky Session 或映射的渠道不可用，选择新渠道
-    const newChannel = await this.selectNewChannel(apiKey);
+    // 4. 没有 Sticky Session 或映射的渠道不可用，选择新渠道
+    const newChannel = this.selectLeastRecentlyUsed(candidateChannels);
 
-    // 4. 建立新的会话映射
+    // 5. 建立新的会话映射
     if (sessionHash) {
       await this.sessionStorage.setMapping(sessionHash, newChannel.id, apiKey.id);
       this.logger.log(`🆕 Created sticky session: ${sessionHash} → ${newChannel.name}`);
     }
+
+    // 6. 异步更新最后使用时间
+    this.prisma.channel
+      .update({
+        where: { id: newChannel.id },
+        data: { lastUsedAt: new Date() },
+      })
+      .catch((error) => {
+        this.logger.error(`Failed to update channel lastUsedAt: ${error.message}`);
+      });
 
     return newChannel;
   }
@@ -71,11 +102,12 @@ export class ClaudeChannelSelectorService {
   }
 
   /**
-   * 尝试获取 Sticky Session 对应的渠道（优先使用缓存）
+   * 尝试获取 Sticky Session 对应的渠道（验证是否在候选列表中）
    */
   private async tryGetStickyChannel(
     sessionHash: string,
-    apiKeyId: string
+    apiKeyId: string,
+    candidateChannels: Channel[]
   ): Promise<Channel | null> {
     try {
       // 获取会话映射
@@ -91,30 +123,30 @@ export class ClaudeChannelSelectorService {
         return null;
       }
 
-      // 优先从缓存获取渠道（指定绑定渠道 ID）
-      const channel = await this.channelPoolCache.getChannel(mapping.channelId);
+      // 检查粘性会话的渠道是否在候选列表中
+      const stickyChannel = candidateChannels.find(
+        (ch) => ch.id === mapping.channelId
+      );
 
-      if (!channel) {
-        this.logger.warn(`⚠️ Mapped channel not found or unavailable: ${mapping.channelId}`);
-        // 删除无效映射
+      if (!stickyChannel) {
+        // 渠道不在候选列表中（可能被移出分组）
+        this.logger.warn(`⚠️ Sticky channel not in candidate list: ${mapping.channelId}`);
         await this.sessionStorage.deleteMapping(sessionHash);
         return null;
       }
 
-      // 检查渠道状态（缓存可能稍有延迟）
-      if (channel.status !== ChannelStatus.ACTIVE) {
-        this.logger.warn(`⚠️ Mapped channel not active: ${channel.name} (${channel.status})`);
+      // 检查渠道是否可用
+      if (!this.isChannelAvailable(stickyChannel)) {
+        this.logger.warn(`⚠️ Sticky channel not available: ${stickyChannel.name}`);
 
         // 如果是限流且已过期，尝试恢复
         if (
-          channel.status === ChannelStatus.RATE_LIMITED &&
-          channel.rateLimitEndAt &&
-          new Date() > channel.rateLimitEndAt
+          stickyChannel.status === ChannelStatus.RATE_LIMITED &&
+          stickyChannel.rateLimitEndAt &&
+          new Date() > stickyChannel.rateLimitEndAt
         ) {
-          await this.restoreChannel(channel.id);
-          // 刷新缓存中的渠道信息
-          await this.channelPoolCache.refresh();
-          return channel;
+          await this.restoreChannel(stickyChannel.id);
+          return stickyChannel;
         }
 
         // 删除映射，让用户使用其他渠道
@@ -122,39 +154,127 @@ export class ClaudeChannelSelectorService {
         return null;
       }
 
-      return channel;
+      return stickyChannel;
     } catch (error) {
       this.logger.error(`❌ Failed to get sticky channel: ${error.message}`);
       return null;
     }
   }
 
-  /**
-   * 选择新渠道（优先使用缓存）
-   */
-  private async selectNewChannel(apiKey: ApiKeyInfo): Promise<Channel> {
-    // 从缓存池获取渠道（如果有绑定渠道，传递 channelId）
-    const channel = await this.channelPoolCache.getChannel(apiKey.channelId || undefined);
 
-    if (!channel) {
-      if (apiKey.channelId) {
-        throw new BadRequestException('Bound channel is not available');
-      } else {
-        throw new BadRequestException('No available Claude channels');
-      }
+  /**
+   * 根据 API Key 的 targetType 获取候选渠道列表
+   */
+  private async getCandidateChannels(apiKey: ApiKeyInfo): Promise<Channel[]> {
+    const targetType = apiKey.channelTargetType || ChannelTargetType.CHANNEL;
+
+    switch (targetType) {
+      case ChannelTargetType.CHANNEL:
+        return this.getChannelById(apiKey.channelId);
+
+      case ChannelTargetType.PROVIDER:
+        return this.getChannelsByProvider(apiKey.providerId);
+
+      default:
+        this.logger.error(`Unknown channel target type: ${targetType}`);
+        return [];
+    }
+  }
+
+  /**
+   * 获取单个渠道（CHANNEL模式）
+   */
+  private async getChannelById(channelId?: string): Promise<Channel[]> {
+    if (!channelId) {
+      // 如果没有指定渠道，从缓存池获取
+      const channel = await this.channelPoolCache.getChannel();
+      return channel ? [channel] : [];
     }
 
-    // 异步更新最后使用时间（不阻塞响应）
-    this.prisma.channel
-      .update({
-        where: { id: channel.id },
-        data: { lastUsedAt: new Date() },
-      })
-      .catch((error) => {
-        this.logger.error(`Failed to update channel lastUsedAt: ${error.message}`);
+    // 从缓存池获取指定渠道
+    const channel = await this.channelPoolCache.getChannel(channelId);
+    return channel ? [channel] : [];
+  }
+
+  /**
+   * 获取供货商下的所有可用渠道（PROVIDER模式 - 按LRU排序）
+   */
+  private async getChannelsByProvider(providerId?: string): Promise<Channel[]> {
+    if (!providerId) {
+      this.logger.warn('Provider ID is required for PROVIDER target type');
+      return [];
+    }
+
+    try {
+      const channels = await this.prisma.channel.findMany({
+        where: {
+          providerId,
+          deletedAt: null,
+          isActive: true,
+          status: ChannelStatus.ACTIVE,
+        },
+        orderBy: [
+          { lastUsedAt: 'asc' },  // 最久未使用优先
+          { priority: 'asc' },    // 次按优先级
+        ],
       });
 
-    return channel;
+      this.logger.debug(`Found ${channels.length} channels for provider ${providerId}`);
+      return channels;
+    } catch (error) {
+      this.logger.error(`Failed to get channels by provider: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * 选择最久未使用的渠道（LRU策略）
+   */
+  private selectLeastRecentlyUsed(candidates: Channel[]): Channel {
+    // 候选渠道已按 lastUsedAt 升序排列
+    // 选择第一个可用的渠道
+    for (const channel of candidates) {
+      if (this.isChannelAvailable(channel)) {
+        this.logger.log(`📍 Selected channel (LRU): ${channel.name}`);
+        return channel;
+      }
+      this.logger.warn(`⚠️ Channel ${channel.name} not available, trying next...`);
+    }
+
+    // 如果所有候选渠道都不可用
+    throw new BadRequestException(
+      `All ${candidates.length} candidate channels are unavailable`
+    );
+  }
+
+  /**
+   * 检查渠道是否可用
+   */
+  private isChannelAvailable(channel: Channel): boolean {
+    // 基本状态检查
+    if (!channel.isActive) {
+      return false;
+    }
+
+    if (channel.status !== ChannelStatus.ACTIVE) {
+      // 检查限流是否已过期
+      if (
+        channel.status === ChannelStatus.RATE_LIMITED &&
+        channel.rateLimitEndAt &&
+        new Date() > channel.rateLimitEndAt
+      ) {
+        return true;  // 限流已过期，可以尝试使用
+      }
+      return false;
+    }
+
+    // 检查错误计数（连续错误过多则跳过）
+    const MAX_ERROR_COUNT = 5;
+    if (channel.errorCount >= MAX_ERROR_COUNT) {
+      return false;
+    }
+
+    return true;
   }
 
   /**

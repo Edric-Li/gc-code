@@ -23,7 +23,7 @@ import {
   ApiKeyRankingResponse,
   ValidateKeyResult,
 } from './entities/api-key-response.entity';
-import { KeyStatus, Prisma } from '@prisma/client';
+import { KeyStatus, Prisma, ChannelTargetType } from '@prisma/client';
 import * as crypto from 'crypto';
 import { ApiKeyCacheService } from '../claude-relay/services/api-key-cache.service';
 
@@ -91,17 +91,37 @@ export class ApiKeysService {
     // 转换日期字符串
     const expiresAt = createApiKeyDto.expiresAt ? new Date(createApiKeyDto.expiresAt) : null;
 
-    // 如果指定了channelId，验证渠道是否存在
-    if (createApiKeyDto.channelId) {
-      const channel = await this.prisma.channel.findFirst({
+    // 根据 channelTargetType 验证关联资源
+    const channelTargetType = createApiKeyDto.channelTargetType || ChannelTargetType.CHANNEL;
+
+    if (channelTargetType === ChannelTargetType.CHANNEL) {
+      // 验证渠道是否存在
+      if (createApiKeyDto.channelId) {
+        const channel = await this.prisma.channel.findFirst({
+          where: {
+            id: createApiKeyDto.channelId,
+            deletedAt: null,
+          },
+        });
+
+        if (!channel) {
+          throw new NotFoundException(`Channel with ID ${createApiKeyDto.channelId} not found`);
+        }
+      }
+    } else if (channelTargetType === ChannelTargetType.PROVIDER) {
+      // 验证供货商是否存在
+      if (!createApiKeyDto.providerId) {
+        throw new BadRequestException('providerId is required when targetType is PROVIDER');
+      }
+
+      const provider = await this.prisma.aiProvider.findFirst({
         where: {
-          id: createApiKeyDto.channelId,
-          deletedAt: null,
+          id: createApiKeyDto.providerId,
         },
       });
 
-      if (!channel) {
-        throw new NotFoundException(`Channel with ID ${createApiKeyDto.channelId} not found`);
+      if (!provider) {
+        throw new NotFoundException(`AI Provider with ID ${createApiKeyDto.providerId} not found`);
       }
     }
 
@@ -109,7 +129,9 @@ export class ApiKeysService {
     const apiKey = await this.prisma.apiKey.create({
       data: {
         userId: targetUserId,
+        channelTargetType,
         channelId: createApiKeyDto.channelId || null,
+        providerId: createApiKeyDto.providerId || null,
         name: createApiKeyDto.name,
         description: createApiKeyDto.description,
         key,
@@ -207,17 +229,37 @@ export class ApiKeysService {
     // 转换日期字符串
     const expiresAt = createApiKeyDto.expiresAt ? new Date(createApiKeyDto.expiresAt) : null;
 
-    // 如果指定了channelId，验证渠道是否存在
-    if (createApiKeyDto.channelId) {
-      const channel = await this.prisma.channel.findFirst({
+    // 根据 channelTargetType 验证关联资源
+    const channelTargetType = createApiKeyDto.channelTargetType || ChannelTargetType.CHANNEL;
+
+    if (channelTargetType === ChannelTargetType.CHANNEL) {
+      // 验证渠道是否存在
+      if (createApiKeyDto.channelId) {
+        const channel = await this.prisma.channel.findFirst({
+          where: {
+            id: createApiKeyDto.channelId,
+            deletedAt: null,
+          },
+        });
+
+        if (!channel) {
+          throw new NotFoundException(`Channel with ID ${createApiKeyDto.channelId} not found`);
+        }
+      }
+    } else if (channelTargetType === ChannelTargetType.PROVIDER) {
+      // 验证供货商是否存在
+      if (!createApiKeyDto.providerId) {
+        throw new BadRequestException('providerId is required when targetType is PROVIDER');
+      }
+
+      const provider = await this.prisma.aiProvider.findFirst({
         where: {
-          id: createApiKeyDto.channelId,
-          deletedAt: null,
+          id: createApiKeyDto.providerId,
         },
       });
 
-      if (!channel) {
-        throw new NotFoundException(`Channel with ID ${createApiKeyDto.channelId} not found`);
+      if (!provider) {
+        throw new NotFoundException(`AI Provider with ID ${createApiKeyDto.providerId} not found`);
       }
     }
 
@@ -225,7 +267,9 @@ export class ApiKeysService {
     const apiKey = await this.prisma.apiKey.create({
       data: {
         userId: targetUserId,
+        channelTargetType,
         channelId: createApiKeyDto.channelId || null,
+        providerId: createApiKeyDto.providerId || null,
         name: createApiKeyDto.name,
         description: createApiKeyDto.description,
         key,
@@ -487,25 +531,86 @@ export class ApiKeysService {
     if (updateApiKeyDto.dailyCostLimit !== undefined) {
       updateData.dailyCostLimit = new Prisma.Decimal(updateApiKeyDto.dailyCostLimit);
     }
-    if (updateApiKeyDto.channelId !== undefined) {
-      // 如果指定了channelId，验证渠道是否存在
-      if (updateApiKeyDto.channelId) {
-        const channel = await this.prisma.channel.findFirst({
-          where: {
-            id: updateApiKeyDto.channelId,
-            deletedAt: null,
-          },
-        });
 
-        if (!channel) {
-          throw new NotFoundException(`Channel with ID ${updateApiKeyDto.channelId} not found`);
+    // 处理渠道目标类型更新
+    if (updateApiKeyDto.channelTargetType !== undefined) {
+      updateData.channelTargetType = updateApiKeyDto.channelTargetType;
+
+      // 根据新的 targetType 验证和更新关联
+      if (updateApiKeyDto.channelTargetType === ChannelTargetType.CHANNEL) {
+        if (updateApiKeyDto.channelId !== undefined) {
+          if (updateApiKeyDto.channelId) {
+            const channel = await this.prisma.channel.findFirst({
+              where: {
+                id: updateApiKeyDto.channelId,
+                deletedAt: null,
+              },
+            });
+
+            if (!channel) {
+              throw new NotFoundException(`Channel with ID ${updateApiKeyDto.channelId} not found`);
+            }
+            updateData.channel = { connect: { id: updateApiKeyDto.channelId } };
+          } else {
+            updateData.channel = { disconnect: true };
+          }
+        }
+        // 清除其他类型的关联
+        updateData.provider = { disconnect: true };
+      } else if (updateApiKeyDto.channelTargetType === ChannelTargetType.PROVIDER) {
+        if (updateApiKeyDto.providerId !== undefined) {
+          if (updateApiKeyDto.providerId) {
+            const provider = await this.prisma.aiProvider.findFirst({
+              where: {
+                id: updateApiKeyDto.providerId,
+              },
+            });
+
+            if (!provider) {
+              throw new NotFoundException(`AI Provider with ID ${updateApiKeyDto.providerId} not found`);
+            }
+            updateData.provider = { connect: { id: updateApiKeyDto.providerId } };
+          } else {
+            updateData.provider = { disconnect: true };
+          }
+        }
+        // 清除其他类型的关联
+        updateData.channel = { disconnect: true };
+      }
+    } else {
+      // 如果只更新关联ID（不更新targetType）
+      if (updateApiKeyDto.channelId !== undefined) {
+        if (updateApiKeyDto.channelId) {
+          const channel = await this.prisma.channel.findFirst({
+            where: {
+              id: updateApiKeyDto.channelId,
+              deletedAt: null,
+            },
+          });
+
+          if (!channel) {
+            throw new NotFoundException(`Channel with ID ${updateApiKeyDto.channelId} not found`);
+          }
+          updateData.channel = { connect: { id: updateApiKeyDto.channelId } };
+        } else {
+          updateData.channel = { disconnect: true };
         }
       }
-      // Use Prisma's relation syntax for updating foreign keys
-      if (updateApiKeyDto.channelId) {
-        updateData.channel = { connect: { id: updateApiKeyDto.channelId } };
-      } else {
-        updateData.channel = { disconnect: true };
+      if (updateApiKeyDto.providerId !== undefined) {
+        if (updateApiKeyDto.providerId) {
+          const provider = await this.prisma.aiProvider.findFirst({
+            where: {
+              id: updateApiKeyDto.providerId,
+            },
+          });
+
+          if (!provider) {
+            throw new NotFoundException(`AI Provider with ID ${updateApiKeyDto.providerId} not found`);
+          }
+          updateData.provider = { connect: { id: updateApiKeyDto.providerId } };
+        } else {
+          updateData.provider = { disconnect: true };
+        }
       }
     }
 
