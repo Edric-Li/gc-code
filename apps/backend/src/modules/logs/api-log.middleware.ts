@@ -74,7 +74,9 @@ export class ApiLogMiddleware implements NestMiddleware {
     res.end = ((chunk: unknown, ...args: unknown[]): Response => {
       const statusCode = res.statusCode;
 
-      // 仅在错误状态码时提取错误信息
+      const duration = Date.now() - startTime;
+
+      // 仅在错误状态码时记录日志和提取错误信息
       if (statusCode >= 400) {
         if (chunk) {
           chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string));
@@ -98,23 +100,21 @@ export class ApiLogMiddleware implements NestMiddleware {
             // 如果不是 JSON，忽略
           }
         }
+
+        // 异步记录错误日志，不阻塞响应
+        setImmediate(() => {
+          this.saveLog(
+            req,
+            method,
+            originalUrl,
+            statusCode,
+            duration,
+            ipAddress,
+            userAgent,
+            errorMessage
+          );
+        });
       }
-
-      const duration = Date.now() - startTime;
-
-      // 异步记录日志，不阻塞响应
-      setImmediate(() => {
-        this.saveLog(
-          req,
-          method,
-          originalUrl,
-          statusCode,
-          duration,
-          ipAddress,
-          userAgent,
-          errorMessage
-        );
-      });
 
       return originalEnd.apply(res, [chunk, ...args] as Parameters<typeof originalEnd>);
     }) as typeof res.end;
