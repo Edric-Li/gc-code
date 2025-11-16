@@ -194,7 +194,6 @@ model ApiLog {
   userAgent      String? @map("user_agent") @db.Text
   requestHeaders Json?   @map("request_headers")
   requestBody    Json?   @map("request_body")
-  responseBody   Json?   @map("response_body")
   errorMessage   String? @map("error_message") @db.Text
   createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamp(3)
 
@@ -204,6 +203,8 @@ model ApiLog {
   @@index([createdAt], name: "idx_api_logs_created_at")
   @@index([path], name: "idx_api_logs_path")
   @@index([statusCode], name: "idx_api_logs_status_code")
+  @@index([method], name: "idx_api_logs_method")
+  @@index([statusCode, createdAt(sort: Desc)], name: "idx_api_logs_status_created")
   @@map("api_logs")
 }
 

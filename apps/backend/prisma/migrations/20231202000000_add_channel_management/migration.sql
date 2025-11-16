@@ -1,8 +1,9 @@
 -- AlterTable
-ALTER TABLE "api_keys" ADD COLUMN IF NOT EXISTS "channel_id" UUID;
+ALTER TABLE "api_keys" RENAME CONSTRAINT "api_tokens_pkey" TO "api_keys_pkey",
+ADD COLUMN     "channel_id" UUID;
 
 -- CreateTable
-CREATE TABLE IF NOT EXISTS "ai_providers" (
+CREATE TABLE "ai_providers" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "name" VARCHAR(100) NOT NULL,
     "slug" VARCHAR(50) NOT NULL,
@@ -21,7 +22,7 @@ CREATE TABLE IF NOT EXISTS "ai_providers" (
 );
 
 -- CreateTable
-CREATE TABLE IF NOT EXISTS "channels" (
+CREATE TABLE "channels" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "provider_id" UUID NOT NULL,
     "name" VARCHAR(255) NOT NULL,
@@ -46,7 +47,7 @@ CREATE TABLE IF NOT EXISTS "channels" (
 );
 
 -- CreateTable
-CREATE TABLE IF NOT EXISTS "channel_models" (
+CREATE TABLE "channel_models" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "channel_id" UUID NOT NULL,
     "model_name" VARCHAR(100) NOT NULL,
@@ -59,7 +60,7 @@ CREATE TABLE IF NOT EXISTS "channel_models" (
 );
 
 -- CreateTable
-CREATE TABLE IF NOT EXISTS "channel_usage" (
+CREATE TABLE "channel_usage" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "channel_id" UUID NOT NULL,
     "api_key_id" UUID NOT NULL,
@@ -136,3 +137,5 @@ ALTER TABLE "channel_models" ADD CONSTRAINT "channel_models_channel_id_fkey" FOR
 -- AddForeignKey
 ALTER TABLE "channel_usage" ADD CONSTRAINT "channel_usage_channel_id_fkey" FOREIGN KEY ("channel_id") REFERENCES "channels"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
+-- RenameIndex
+ALTER INDEX "api_tokens_token_key" RENAME TO "api_keys_key_key";

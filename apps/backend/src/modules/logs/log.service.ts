@@ -213,17 +213,21 @@ export class LogService {
     if (params.userId) where.userId = params.userId;
     if (params.method) where.method = params.method;
     if (params.path) where.path = { contains: params.path };
-    // 支持状态码范围查询（如 2 代表 200-299，4 代表 400-499）
-    if (params.statusCode) {
-      if (params.statusCode < 10) {
-        // 如果是单个数字，表示范围查询
+
+    // 状态码过滤逻辑：
+    // - 传入 2, 3, 4, 5 表示范围查询 (如 2 = 200-299, 4 = 400-499)
+    // - 传入 100-599 表示精确匹配特定状态码
+    if (params.statusCode !== undefined && params.statusCode !== null) {
+      if (params.statusCode >= 2 && params.statusCode <= 5) {
+        // 范围查询：2xx, 3xx, 4xx, 5xx
         const rangeStart = params.statusCode * 100;
         const rangeEnd = rangeStart + 99;
         where.statusCode = { gte: rangeStart, lte: rangeEnd };
-      } else {
-        // 精确匹配
+      } else if (params.statusCode >= 100 && params.statusCode <= 599) {
+        // 精确匹配：具体的 HTTP 状态码
         where.statusCode = params.statusCode;
       }
+      // 其他无效值会被忽略
     }
     if (params.startDate || params.endDate) {
       where.createdAt = {};

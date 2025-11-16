@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../common/prisma.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
@@ -10,13 +11,22 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 export class LogCleanupService implements OnModuleInit {
   private readonly logger = new Logger(LogCleanupService.name);
 
-  // 配置参数
-  private readonly API_LOG_RETENTION_DAYS = 30; // API 日志保留30天
-  private readonly LOGIN_LOG_RETENTION_DAYS = 90; // 登录日志保留90天
-  private readonly AUDIT_LOG_RETENTION_DAYS = 180; // 审计日志保留180天
-  private readonly CLEANUP_BATCH_SIZE = 1000; // 每批删除1000条
+  // 配置参数（支持环境变量覆盖）
+  private readonly API_LOG_RETENTION_DAYS: number;
+  private readonly LOGIN_LOG_RETENTION_DAYS: number;
+  private readonly AUDIT_LOG_RETENTION_DAYS: number;
+  private readonly CLEANUP_BATCH_SIZE: number;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService
+  ) {
+    // 从环境变量读取配置，提供默认值
+    this.API_LOG_RETENTION_DAYS = this.configService.get<number>('LOG_API_RETENTION_DAYS', 30);
+    this.LOGIN_LOG_RETENTION_DAYS = this.configService.get<number>('LOG_LOGIN_RETENTION_DAYS', 90);
+    this.AUDIT_LOG_RETENTION_DAYS = this.configService.get<number>('LOG_AUDIT_RETENTION_DAYS', 180);
+    this.CLEANUP_BATCH_SIZE = this.configService.get<number>('LOG_CLEANUP_BATCH_SIZE', 1000);
+  }
 
   onModuleInit() {
     this.logger.log(
@@ -32,29 +42,50 @@ export class LogCleanupService implements OnModuleInit {
   async cleanupOldLogs(): Promise<void> {
     this.logger.log('Starting log cleanup task...');
 
+    let totalDeleted = 0;
+    const results: string[] = [];
+
+    // 清理 API 日志（独立错误处理）
     try {
-      // 清理 API 日志
       const apiDeleted = await this.cleanupApiLogs();
       this.logger.log(`✅ API logs cleanup completed: ${apiDeleted} logs deleted`);
+      totalDeleted += apiDeleted;
+      results.push(`API: ${apiDeleted}`);
+    } catch (error) {
+      this.logger.error(`❌ API logs cleanup failed: ${error.message}`, error.stack);
+      results.push('API: failed');
+    }
 
-      // 清理登录日志
+    // 清理登录日志（独立错误处理）
+    try {
       const loginDeleted = await this.cleanupLoginLogs();
       this.logger.log(`✅ Login logs cleanup completed: ${loginDeleted} logs deleted`);
+      totalDeleted += loginDeleted;
+      results.push(`Login: ${loginDeleted}`);
+    } catch (error) {
+      this.logger.error(`❌ Login logs cleanup failed: ${error.message}`, error.stack);
+      results.push('Login: failed');
+    }
 
-      // 清理审计日志
+    // 清理审计日志（独立错误处理）
+    try {
       const auditDeleted = await this.cleanupAuditLogs();
       this.logger.log(`✅ Audit logs cleanup completed: ${auditDeleted} logs deleted`);
-
-      this.logger.log(
-        `✅ All logs cleanup completed: Total ${apiDeleted + loginDeleted + auditDeleted} logs deleted`
-      );
+      totalDeleted += auditDeleted;
+      results.push(`Audit: ${auditDeleted}`);
     } catch (error) {
-      this.logger.error(`❌ Log cleanup failed: ${error.message}`, error.stack);
+      this.logger.error(`❌ Audit logs cleanup failed: ${error.message}`, error.stack);
+      results.push('Audit: failed');
     }
+
+    this.logger.log(
+      `✅ Log cleanup task completed: Total ${totalDeleted} logs deleted (${results.join(', ')})`
+    );
   }
 
   /**
    * 清理 API 日志
+   * 使用 CTE 优化查询性能
    */
   private async cleanupApiLogs(): Promise<number> {
     const cutoffDate = this.getCutoffDate(this.API_LOG_RETENTION_DAYS);
@@ -66,12 +97,14 @@ export class LogCleanupService implements OnModuleInit {
     // 分批删除，避免长事务
     while (hasMore) {
       const result = await this.prisma.$executeRaw`
-        DELETE FROM api_logs
-        WHERE id IN (
+        WITH to_delete AS (
           SELECT id FROM api_logs
           WHERE created_at < ${cutoffDate}
+          ORDER BY created_at ASC
           LIMIT ${this.CLEANUP_BATCH_SIZE}
         )
+        DELETE FROM api_logs
+        WHERE id IN (SELECT id FROM to_delete)
       `;
 
       const deletedCount = Number(result);
@@ -91,6 +124,7 @@ export class LogCleanupService implements OnModuleInit {
 
   /**
    * 清理登录日志
+   * 使用 CTE 优化查询性能
    */
   private async cleanupLoginLogs(): Promise<number> {
     const cutoffDate = this.getCutoffDate(this.LOGIN_LOG_RETENTION_DAYS);
@@ -101,12 +135,14 @@ export class LogCleanupService implements OnModuleInit {
 
     while (hasMore) {
       const result = await this.prisma.$executeRaw`
-        DELETE FROM login_logs
-        WHERE id IN (
+        WITH to_delete AS (
           SELECT id FROM login_logs
           WHERE created_at < ${cutoffDate}
+          ORDER BY created_at ASC
           LIMIT ${this.CLEANUP_BATCH_SIZE}
         )
+        DELETE FROM login_logs
+        WHERE id IN (SELECT id FROM to_delete)
       `;
 
       const deletedCount = Number(result);
@@ -126,6 +162,7 @@ export class LogCleanupService implements OnModuleInit {
 
   /**
    * 清理审计日志
+   * 使用 CTE 优化查询性能
    */
   private async cleanupAuditLogs(): Promise<number> {
     const cutoffDate = this.getCutoffDate(this.AUDIT_LOG_RETENTION_DAYS);
@@ -136,12 +173,14 @@ export class LogCleanupService implements OnModuleInit {
 
     while (hasMore) {
       const result = await this.prisma.$executeRaw`
-        DELETE FROM audit_logs
-        WHERE id IN (
+        WITH to_delete AS (
           SELECT id FROM audit_logs
           WHERE created_at < ${cutoffDate}
+          ORDER BY created_at ASC
           LIMIT ${this.CLEANUP_BATCH_SIZE}
         )
+        DELETE FROM audit_logs
+        WHERE id IN (SELECT id FROM to_delete)
       `;
 
       const deletedCount = Number(result);

@@ -60,12 +60,26 @@ export class ApiLogMiddleware implements NestMiddleware {
     const originalEnd = res.end;
     let errorMessage: string | undefined;
     const chunks: Buffer[] = [];
+    const MAX_BUFFER_SIZE = 1024 * 1024; // 1MB 缓冲区限制
+    let totalSize = 0;
 
     // 仅在错误状态码时捕获响应体以提取错误信息
     const originalWrite = res.write;
     res.write = function (chunk: unknown, ...args: unknown[]): boolean {
-      if (chunk && res.statusCode >= 400) {
-        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string));
+      if (chunk && res.statusCode >= 400 && totalSize < MAX_BUFFER_SIZE) {
+        const buffer = Buffer.isBuffer(chunk)
+          ? chunk
+          : typeof chunk === 'string'
+            ? Buffer.from(chunk)
+            : null;
+
+        if (buffer) {
+          const newSize = totalSize + buffer.length;
+          if (newSize <= MAX_BUFFER_SIZE) {
+            chunks.push(buffer);
+            totalSize = newSize;
+          }
+        }
       }
       return originalWrite.apply(res, [chunk, ...args] as Parameters<typeof originalWrite>);
     };
@@ -78,8 +92,20 @@ export class ApiLogMiddleware implements NestMiddleware {
 
       // 仅在错误状态码时记录日志和提取错误信息
       if (statusCode >= 400) {
-        if (chunk) {
-          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string));
+        if (chunk && totalSize < MAX_BUFFER_SIZE) {
+          const buffer = Buffer.isBuffer(chunk)
+            ? chunk
+            : typeof chunk === 'string'
+              ? Buffer.from(chunk)
+              : null;
+
+          if (buffer) {
+            const newSize = totalSize + buffer.length;
+            if (newSize <= MAX_BUFFER_SIZE) {
+              chunks.push(buffer);
+              totalSize = newSize;
+            }
+          }
         }
 
         if (chunks.length > 0) {
@@ -139,10 +165,17 @@ export class ApiLogMiddleware implements NestMiddleware {
       // 获取请求头（过滤敏感信息）
       const requestHeaders = this.sanitizeHeaders(req.headers as Record<string, unknown>);
 
-      // 获取请求体（过滤敏感信息）
-      let requestBody: Record<string, unknown> | undefined;
+      // 获取请求体（过滤敏感信息，限制大小）
+      const MAX_REQUEST_BODY_SIZE = 100 * 1024; // 100KB
+      let requestBody: Record<string, unknown> | string | undefined;
       if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
-        requestBody = this.sanitizeBody(req.body);
+        // 检查请求体大小
+        const bodySize = JSON.stringify(req.body).length;
+        if (bodySize > MAX_REQUEST_BODY_SIZE) {
+          requestBody = `[REQUEST_BODY_TOO_LARGE: ${(bodySize / 1024).toFixed(2)}KB]`;
+        } else {
+          requestBody = this.sanitizeBody(req.body);
+        }
       }
 
       // 转换 HTTP 方法
@@ -175,7 +208,13 @@ export class ApiLogMiddleware implements NestMiddleware {
       'set-cookie',
       'x-api-key',
       'x-auth-token',
+      'x-csrf-token',
+      'x-xsrf-token',
       'proxy-authorization',
+      'x-forwarded-authorization',
+      'authentication-info',
+      'www-authenticate',
+      'proxy-authenticate',
     ];
     const sanitized: Record<string, unknown> = {};
 
@@ -192,19 +231,70 @@ export class ApiLogMiddleware implements NestMiddleware {
 
   /**
    * 脱敏请求体
+   * @param body 请求体对象
+   * @param depth 当前递归深度
+   * @param visited 已访问对象集合，用于检测循环引用
+   * @param maxDepth 最大递归深度
    */
-  private sanitizeBody(body: Record<string, unknown>): Record<string, unknown> {
+  private sanitizeBody(
+    body: Record<string, unknown>,
+    depth = 0,
+    visited: WeakSet<object> = new WeakSet(),
+    maxDepth = 5
+  ): Record<string, unknown> | string {
+    // 检查深度限制
+    if (depth > maxDepth) {
+      return '[MAX_DEPTH_EXCEEDED]';
+    }
+
+    // 检查循环引用
+    if (visited.has(body)) {
+      return '[CIRCULAR_REFERENCE]';
+    }
+    visited.add(body);
+
     const sensitiveKeys = ['password', 'token', 'secret', 'apiKey', 'api_key', 'authorization'];
     const sanitized: Record<string, unknown> = {};
 
-    for (const [key, value] of Object.entries(body)) {
-      if (sensitiveKeys.some((k) => key.toLowerCase().includes(k.toLowerCase()))) {
-        sanitized[key] = '[REDACTED]';
-      } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-        sanitized[key] = this.sanitizeBody(value as Record<string, unknown>);
-      } else {
-        sanitized[key] = value;
+    try {
+      for (const [key, value] of Object.entries(body)) {
+        // 敏感字段脱敏
+        if (sensitiveKeys.some((k) => key.toLowerCase().includes(k.toLowerCase()))) {
+          sanitized[key] = '[REDACTED]';
+        } else if (Array.isArray(value)) {
+          // 处理数组，限制大小
+          const maxArrayLength = 100;
+          sanitized[key] =
+            value.length > maxArrayLength
+              ? `[ARRAY_TOO_LARGE: ${value.length} items]`
+              : value.map((item) =>
+                  typeof item === 'object' && item !== null && !Array.isArray(item)
+                    ? this.sanitizeBody(
+                        item as Record<string, unknown>,
+                        depth + 1,
+                        visited,
+                        maxDepth
+                      )
+                    : item
+                );
+        } else if (typeof value === 'object' && value !== null) {
+          // 递归处理嵌套对象
+          const result = this.sanitizeBody(
+            value as Record<string, unknown>,
+            depth + 1,
+            visited,
+            maxDepth
+          );
+          sanitized[key] = result;
+        } else if (typeof value === 'string' && value.length > 10000) {
+          // 限制字符串长度
+          sanitized[key] = `[STRING_TOO_LARGE: ${value.length} chars]`;
+        } else {
+          sanitized[key] = value;
+        }
       }
+    } catch (error) {
+      return '[SANITIZATION_ERROR]';
     }
 
     return sanitized;
