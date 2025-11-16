@@ -87,6 +87,10 @@ COPY nginx-fullstack.conf /etc/nginx/http.d/default.conf
 # 复制 supervisor 配置
 COPY supervisord.conf /etc/supervisord.conf
 
+# 复制启动脚本（自动执行数据库迁移）
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
 # 创建日志目录
 RUN mkdir -p /var/log/supervisor /run/nginx
 
@@ -98,5 +102,5 @@ ENV NODE_ENV=production
 ENV PORT=5555
 ENV API_PREFIX=/api
 
-# 使用 supervisor 启动 nginx 和后端服务
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+# 使用启动脚本（包含自动迁移）
+CMD ["/docker-entrypoint.sh"]
