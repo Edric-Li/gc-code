@@ -68,12 +68,12 @@ export class CreateApiKeyDto {
   channelTargetType?: ChannelTargetType = ChannelTargetType.CHANNEL;
 
   @ApiPropertyOptional({
-    description: '关联的渠道ID（当 targetType=CHANNEL 时使用）',
+    description:
+      '关联的渠道ID。CHANNEL模式：指定使用的渠道。PROVIDER模式：可选的专属渠道（优先使用，必须属于所选供货商）',
     example: 'f5f6g7h8-i9j0-k1l2-m3n4-o5p6q7r8s9t0',
   })
   @IsUUID()
   @IsOptional()
-  @ValidateIf((o) => o.channelTargetType === ChannelTargetType.CHANNEL)
   channelId?: string;
 
   @ApiPropertyOptional({

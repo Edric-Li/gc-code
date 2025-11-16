@@ -123,6 +123,23 @@ export class ApiKeysService {
       if (!provider) {
         throw new NotFoundException(`AI Provider with ID ${createApiKeyDto.providerId} not found`);
       }
+
+      // 如果指定了专属渠道，验证该渠道是否属于该供货商
+      if (createApiKeyDto.channelId) {
+        const channel = await this.prisma.channel.findFirst({
+          where: {
+            id: createApiKeyDto.channelId,
+            providerId: createApiKeyDto.providerId,
+            deletedAt: null,
+          },
+        });
+
+        if (!channel) {
+          throw new BadRequestException(
+            `Channel with ID ${createApiKeyDto.channelId} does not belong to provider ${createApiKeyDto.providerId} or does not exist`
+          );
+        }
+      }
     }
 
     // 创建 API Key 记录
@@ -260,6 +277,23 @@ export class ApiKeysService {
 
       if (!provider) {
         throw new NotFoundException(`AI Provider with ID ${createApiKeyDto.providerId} not found`);
+      }
+
+      // 如果指定了专属渠道，验证该渠道是否属于该供货商
+      if (createApiKeyDto.channelId) {
+        const channel = await this.prisma.channel.findFirst({
+          where: {
+            id: createApiKeyDto.channelId,
+            providerId: createApiKeyDto.providerId,
+            deletedAt: null,
+          },
+        });
+
+        if (!channel) {
+          throw new BadRequestException(
+            `Channel with ID ${createApiKeyDto.channelId} does not belong to provider ${createApiKeyDto.providerId} or does not exist`
+          );
+        }
       }
     }
 
@@ -570,32 +604,66 @@ export class ApiKeysService {
               throw new NotFoundException(`AI Provider with ID ${updateApiKeyDto.providerId} not found`);
             }
             updateData.provider = { connect: { id: updateApiKeyDto.providerId } };
+
+            // 如果同时指定了专属渠道，验证该渠道是否属于该供货商
+            if (updateApiKeyDto.channelId !== undefined) {
+              if (updateApiKeyDto.channelId) {
+                const channel = await this.prisma.channel.findFirst({
+                  where: {
+                    id: updateApiKeyDto.channelId,
+                    providerId: updateApiKeyDto.providerId,
+                    deletedAt: null,
+                  },
+                });
+
+                if (!channel) {
+                  throw new BadRequestException(
+                    `Channel with ID ${updateApiKeyDto.channelId} does not belong to provider ${updateApiKeyDto.providerId} or does not exist`
+                  );
+                }
+                updateData.channel = { connect: { id: updateApiKeyDto.channelId } };
+              } else {
+                updateData.channel = { disconnect: true };
+              }
+            }
           } else {
             updateData.provider = { disconnect: true };
+            // 如果清除供货商，也清除专属渠道
+            updateData.channel = { disconnect: true };
+          }
+        } else if (updateApiKeyDto.channelId !== undefined) {
+          // 只更新专属渠道（保持供货商不变）
+          // 需要验证渠道属于当前的供货商
+          const currentProviderId = existingApiKey.providerId;
+          if (!currentProviderId) {
+            throw new BadRequestException('Cannot set channel without a provider');
+          }
+
+          if (updateApiKeyDto.channelId) {
+            const channel = await this.prisma.channel.findFirst({
+              where: {
+                id: updateApiKeyDto.channelId,
+                providerId: currentProviderId,
+                deletedAt: null,
+              },
+            });
+
+            if (!channel) {
+              throw new BadRequestException(
+                `Channel with ID ${updateApiKeyDto.channelId} does not belong to provider ${currentProviderId} or does not exist`
+              );
+            }
+            updateData.channel = { connect: { id: updateApiKeyDto.channelId } };
+          } else {
+            updateData.channel = { disconnect: true };
           }
         }
-        // 清除其他类型的关联
-        updateData.channel = { disconnect: true };
       }
     } else {
       // 如果只更新关联ID（不更新targetType）
-      if (updateApiKeyDto.channelId !== undefined) {
-        if (updateApiKeyDto.channelId) {
-          const channel = await this.prisma.channel.findFirst({
-            where: {
-              id: updateApiKeyDto.channelId,
-              deletedAt: null,
-            },
-          });
+      // 需要根据当前的 targetType 来验证
+      const currentTargetType = existingApiKey.channelTargetType;
 
-          if (!channel) {
-            throw new NotFoundException(`Channel with ID ${updateApiKeyDto.channelId} not found`);
-          }
-          updateData.channel = { connect: { id: updateApiKeyDto.channelId } };
-        } else {
-          updateData.channel = { disconnect: true };
-        }
-      }
       if (updateApiKeyDto.providerId !== undefined) {
         if (updateApiKeyDto.providerId) {
           const provider = await this.prisma.aiProvider.findFirst({
@@ -608,8 +676,70 @@ export class ApiKeysService {
             throw new NotFoundException(`AI Provider with ID ${updateApiKeyDto.providerId} not found`);
           }
           updateData.provider = { connect: { id: updateApiKeyDto.providerId } };
+
+          // 如果同时更新专属渠道，验证渠道属于新的供货商
+          if (updateApiKeyDto.channelId !== undefined && updateApiKeyDto.channelId) {
+            const channel = await this.prisma.channel.findFirst({
+              where: {
+                id: updateApiKeyDto.channelId,
+                providerId: updateApiKeyDto.providerId,
+                deletedAt: null,
+              },
+            });
+
+            if (!channel) {
+              throw new BadRequestException(
+                `Channel with ID ${updateApiKeyDto.channelId} does not belong to provider ${updateApiKeyDto.providerId} or does not exist`
+              );
+            }
+            updateData.channel = { connect: { id: updateApiKeyDto.channelId } };
+          }
         } else {
           updateData.provider = { disconnect: true };
+          // 清除供货商时也清除专属渠道
+          if (currentTargetType === ChannelTargetType.PROVIDER) {
+            updateData.channel = { disconnect: true };
+          }
+        }
+      } else if (updateApiKeyDto.channelId !== undefined) {
+        // 只更新 channelId
+        if (updateApiKeyDto.channelId) {
+          // 如果是 PROVIDER 模式，需要验证渠道属于当前供货商
+          if (currentTargetType === ChannelTargetType.PROVIDER) {
+            const currentProviderId = existingApiKey.providerId;
+            if (!currentProviderId) {
+              throw new BadRequestException('Cannot set channel without a provider in PROVIDER mode');
+            }
+
+            const channel = await this.prisma.channel.findFirst({
+              where: {
+                id: updateApiKeyDto.channelId,
+                providerId: currentProviderId,
+                deletedAt: null,
+              },
+            });
+
+            if (!channel) {
+              throw new BadRequestException(
+                `Channel with ID ${updateApiKeyDto.channelId} does not belong to provider ${currentProviderId} or does not exist`
+              );
+            }
+          } else {
+            // CHANNEL 模式，只需验证渠道存在
+            const channel = await this.prisma.channel.findFirst({
+              where: {
+                id: updateApiKeyDto.channelId,
+                deletedAt: null,
+              },
+            });
+
+            if (!channel) {
+              throw new NotFoundException(`Channel with ID ${updateApiKeyDto.channelId} not found`);
+            }
+          }
+          updateData.channel = { connect: { id: updateApiKeyDto.channelId } };
+        } else {
+          updateData.channel = { disconnect: true };
         }
       }
     }

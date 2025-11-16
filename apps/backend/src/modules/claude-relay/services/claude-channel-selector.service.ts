@@ -175,6 +175,14 @@ export class ClaudeChannelSelectorService {
         return this.getChannelById(apiKey.channelId);
 
       case ChannelTargetType.PROVIDER:
+        // 优先使用专属渠道（如果指定）
+        if (apiKey.channelId) {
+          this.logger.debug(
+            `Using dedicated channel ${apiKey.channelId} for API Key ${apiKey.id} (PROVIDER mode)`
+          );
+          return this.getChannelById(apiKey.channelId);
+        }
+        // 否则从供货商渠道池中选择
         return this.getChannelsByProvider(apiKey.providerId);
 
       default:

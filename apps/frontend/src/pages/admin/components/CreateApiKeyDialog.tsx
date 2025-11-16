@@ -291,27 +291,63 @@ export default function CreateApiKeyDialog({ onClose, onCreate }: CreateApiKeyDi
 
           {/* Provider Selection (when PROVIDER is selected) */}
           {formData.channelTargetType === ChannelTargetType.PROVIDER && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                AI供货商
-              </label>
-              <select
-                value={formData.providerId}
-                onChange={(e) => handleChange('providerId', e.target.value)}
-                disabled={loadingProviders}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-              >
-                <option value="">请选择供货商</option>
-                {providers.map((provider) => (
-                  <option key={provider.id} value={provider.id}>
-                    {provider.name}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                选择供货商，系统会使用 LRU 算法从该供货商的渠道中选择
-              </p>
-            </div>
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  AI供货商
+                </label>
+                <select
+                  value={formData.providerId}
+                  onChange={(e) => {
+                    const newProviderId = e.target.value;
+                    handleChange('providerId', newProviderId);
+                    // 清空专属渠道（如果切换了供货商）
+                    if (newProviderId !== formData.providerId) {
+                      handleChange('channelId', '');
+                    }
+                  }}
+                  disabled={loadingProviders}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+                >
+                  <option value="">请选择供货商</option>
+                  {providers.map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  选择供货商，系统会使用 LRU 算法从该供货商的渠道中选择
+                </p>
+              </div>
+
+              {/* Dedicated Channel Selection (optional, only for selected provider) */}
+              {formData.providerId && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    专属渠道（可选）
+                  </label>
+                  <select
+                    value={formData.channelId}
+                    onChange={(e) => handleChange('channelId', e.target.value)}
+                    disabled={loadingChannels}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+                  >
+                    <option value="">使用 LRU 算法自动选择</option>
+                    {channels
+                      .filter((channel) => channel.provider.id === formData.providerId)
+                      .map((channel) => (
+                        <option key={channel.id} value={channel.id}>
+                          {channel.name}
+                        </option>
+                      ))}
+                  </select>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    指定专属渠道将优先使用，留空则使用 LRU 算法从供货商的所有渠道中自动选择
+                  </p>
+                </div>
+              )}
+            </>
           )}
 
           {/* Actions */}
