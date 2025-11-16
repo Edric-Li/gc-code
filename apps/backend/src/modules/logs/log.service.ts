@@ -80,7 +80,6 @@ export class LogService {
     ipAddress?: string;
     userAgent?: string;
     requestBody?: Record<string, unknown>;
-    responseBody?: Record<string, unknown>;
     errorMessage?: string;
   }) {
     try {
@@ -94,7 +93,6 @@ export class LogService {
           ipAddress: data.ipAddress,
           userAgent: data.userAgent,
           requestBody: data.requestBody as Prisma.InputJsonValue,
-          responseBody: data.responseBody as Prisma.InputJsonValue,
           errorMessage: data.errorMessage,
         },
       });

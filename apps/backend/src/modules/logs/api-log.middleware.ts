@@ -58,13 +58,13 @@ export class ApiLogMiddleware implements NestMiddleware {
 
     // 捕获原始的 end 方法
     const originalEnd = res.end;
-    let responseBody: unknown = null;
+    let errorMessage: string | undefined;
     const chunks: Buffer[] = [];
 
-    // 重写 write 方法来捕获响应体
+    // 仅在错误状态码时捕获响应体以提取错误信息
     const originalWrite = res.write;
     res.write = function (chunk: unknown, ...args: unknown[]): boolean {
-      if (chunk) {
+      if (chunk && res.statusCode >= 400) {
         chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string));
       }
       return originalWrite.apply(res, [chunk, ...args] as Parameters<typeof originalWrite>);
@@ -72,25 +72,35 @@ export class ApiLogMiddleware implements NestMiddleware {
 
     // 重写 end 方法
     res.end = ((chunk: unknown, ...args: unknown[]): Response => {
-      if (chunk) {
-        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string));
-      }
+      const statusCode = res.statusCode;
 
-      // 尝试解析响应体
-      if (chunks.length > 0) {
-        const body = Buffer.concat(chunks).toString('utf8');
-        try {
-          // 只保存较小的响应体（避免大数据）
-          if (body.length < 10000) {
-            responseBody = JSON.parse(body);
+      // 仅在错误状态码时提取错误信息
+      if (statusCode >= 400) {
+        if (chunk) {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string));
+        }
+
+        if (chunks.length > 0) {
+          const body = Buffer.concat(chunks).toString('utf8');
+          try {
+            const errorResponse = JSON.parse(body) as {
+              message?: string | string[];
+              error?: string;
+            };
+            if (errorResponse.message) {
+              errorMessage = Array.isArray(errorResponse.message)
+                ? errorResponse.message.join(', ')
+                : errorResponse.message;
+            } else if (errorResponse.error) {
+              errorMessage = errorResponse.error;
+            }
+          } catch {
+            // 如果不是 JSON，忽略
           }
-        } catch {
-          // 如果不是 JSON，忽略
         }
       }
 
       const duration = Date.now() - startTime;
-      const statusCode = res.statusCode;
 
       // 异步记录日志，不阻塞响应
       setImmediate(() => {
@@ -102,7 +112,7 @@ export class ApiLogMiddleware implements NestMiddleware {
           duration,
           ipAddress,
           userAgent,
-          responseBody
+          errorMessage
         );
       });
 
@@ -120,7 +130,7 @@ export class ApiLogMiddleware implements NestMiddleware {
     duration: number,
     ipAddress: string,
     userAgent: string,
-    responseBody: unknown
+    errorMessage?: string
   ): Promise<void> {
     try {
       // 获取用户 ID（JWT 策略返回完整的 user 对象）
@@ -130,19 +140,6 @@ export class ApiLogMiddleware implements NestMiddleware {
       let requestBody: Record<string, unknown> | undefined;
       if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
         requestBody = this.sanitizeBody(req.body);
-      }
-
-      // 获取错误信息
-      let errorMessage: string | undefined;
-      if (statusCode >= 400 && responseBody && typeof responseBody === 'object') {
-        const errorResponse = responseBody as { message?: string | string[]; error?: string };
-        if (errorResponse.message) {
-          errorMessage = Array.isArray(errorResponse.message)
-            ? errorResponse.message.join(', ')
-            : errorResponse.message;
-        } else if (errorResponse.error) {
-          errorMessage = errorResponse.error;
-        }
       }
 
       // 转换 HTTP 方法
@@ -157,7 +154,6 @@ export class ApiLogMiddleware implements NestMiddleware {
         ipAddress,
         userAgent,
         requestBody,
-        responseBody: responseBody as Record<string, unknown> | undefined,
         errorMessage,
       });
     } catch (error) {
