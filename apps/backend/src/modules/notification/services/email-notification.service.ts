@@ -82,7 +82,14 @@ export class EmailNotificationService {
         try {
           config.password = decryptApiKey(config.password);
         } catch (error) {
-          this.logger.error('解密邮件密码失败，配置可能已损坏', error);
+          const errorMessage =
+            error instanceof Error ? error.message : '未知错误';
+          // 记录加密密码的前8个字符（用于调试）
+          const passwordPrefix = config.password.substring(0, 8);
+          this.logger.error(
+            `解密邮件密码失败，配置可能已损坏或加密密钥已更改 (密码前缀: ${passwordPrefix}...): ${errorMessage}`,
+            error,
+          );
           return null; // 解密失败应该返回 null，避免使用错误的密码
         }
       } else {
@@ -104,35 +111,78 @@ export class EmailNotificationService {
    * AES-256-GCM 加密格式: iv:authTag:encrypted (三个十六进制字符串)
    */
   private isEncrypted(password: string): boolean {
-    // 检查是否符合加密格式：32个字符:32个字符:任意长度
-    return /^[0-9a-f]{32}:[0-9a-f]{32}:[0-9a-f]+$/.test(password);
+    // 检查是否符合加密格式：32个字符:32个字符:16-512个字符
+    // 假设密码最长256字符，AES-256-GCM加密后约512个十六进制字符
+    return /^[0-9a-f]{32}:[0-9a-f]{32}:[0-9a-f]{16,512}$/.test(password);
   }
 
   /**
-   * 发送邮件
+   * 延迟函数（用于重试）
    */
-  async sendEmail(options: SendEmailOptions): Promise<boolean> {
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * 发送邮件（带重试和超时控制）
+   * @param options 邮件选项
+   * @param maxRetries 最大重试次数（默认3次）
+   * @param timeout 超时时间（毫秒，默认30秒）
+   */
+  async sendEmail(
+    options: SendEmailOptions,
+    maxRetries: number = 3,
+    timeout: number = 30000,
+  ): Promise<boolean> {
     if (!this.transporter || !this.currentConfig) {
       this.logger.warn('邮件服务未配置，跳过发送');
       return false;
     }
 
-    try {
-      const mailOptions = {
-        from: `"${this.currentConfig.fromName}" <${this.currentConfig.username}>`,
-        to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
-        subject: options.subject,
-        html: options.html,
-        text: options.text,
-      };
+    const mailOptions = {
+      from: `"${this.currentConfig.fromName}" <${this.currentConfig.username}>`,
+      to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
+      subject: options.subject,
+      html: options.html,
+      text: options.text,
+    };
 
-      const info = await this.transporter.sendMail(mailOptions);
-      this.logger.log(`邮件发送成功: ${info.messageId}`);
-      return true;
-    } catch (error) {
-      this.logger.error('邮件发送失败', error);
-      return false;
+    // 重试机制（指数退避）
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // 添加超时控制
+        const sendPromise = this.transporter.sendMail(mailOptions);
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('邮件发送超时')), timeout),
+        );
+
+        const info = await Promise.race([sendPromise, timeoutPromise]);
+        this.logger.log(
+          `邮件发送成功: ${info.messageId}${attempt > 1 ? ` (重试第 ${attempt - 1} 次后成功)` : ''}`,
+        );
+        return true;
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : '未知错误';
+
+        if (attempt === maxRetries) {
+          this.logger.error(
+            `邮件发送失败（已重试 ${maxRetries - 1} 次）: ${errorMessage}`,
+            error,
+          );
+          return false;
+        }
+
+        // 指数退避：第1次重试等待2秒，第2次等待4秒
+        const delayMs = Math.pow(2, attempt) * 1000;
+        this.logger.warn(
+          `邮件发送失败（第 ${attempt} 次尝试），${delayMs / 1000} 秒后重试: ${errorMessage}`,
+        );
+        await this.delay(delayMs);
+      }
     }
+
+    return false;
   }
 
   /**

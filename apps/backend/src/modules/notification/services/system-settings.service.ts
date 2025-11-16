@@ -23,6 +23,46 @@ export interface AlertConfig {
 export class SystemSettingsService {
   private readonly logger = new Logger(SystemSettingsService.name);
 
+  /**
+   * 验证邮件配置的有效性
+   */
+  private isValidEmailConfig(value: any): value is EmailConfig {
+    return (
+      value &&
+      typeof value === 'object' &&
+      typeof value.host === 'string' &&
+      typeof value.port === 'number' &&
+      typeof value.secure === 'boolean' &&
+      typeof value.username === 'string' &&
+      typeof value.password === 'string' &&
+      typeof value.fromName === 'string' &&
+      value.host.length > 0 &&
+      value.port > 0 &&
+      value.port <= 65535 &&
+      value.username.length > 0 &&
+      value.password.length > 0
+    );
+  }
+
+  /**
+   * 验证告警配置的有效性
+   */
+  private isValidAlertConfig(value: any): value is AlertConfig {
+    return (
+      value &&
+      typeof value === 'object' &&
+      Array.isArray(value.recipients) &&
+      typeof value.cooldownMinutes === 'number' &&
+      typeof value.batchEnabled === 'boolean' &&
+      typeof value.batchIntervalMinutes === 'number' &&
+      Array.isArray(value.enabledTypes) &&
+      value.cooldownMinutes > 0 &&
+      value.batchIntervalMinutes > 0 &&
+      value.recipients.every((r: any) => typeof r === 'string') &&
+      value.enabledTypes.every((t: any) => typeof t === 'string')
+    );
+  }
+
   constructor(private readonly prisma: PrismaService) {}
 
   /**
@@ -43,7 +83,16 @@ export class SystemSettingsService {
         return null;
       }
 
-      return setting.value as EmailConfig;
+      // 运行时类型验证
+      if (!this.isValidEmailConfig(setting.value)) {
+        this.logger.error(
+          '邮件配置格式无效，请检查数据库中的配置是否被篡改',
+          setting.value,
+        );
+        return null;
+      }
+
+      return setting.value;
     } catch (error) {
       this.logger.error('获取邮件配置失败', error);
       return null;
@@ -93,7 +142,16 @@ export class SystemSettingsService {
       });
 
       if (setting && setting.enabled) {
-        return setting.value as AlertConfig;
+        // 运行时类型验证
+        if (!this.isValidAlertConfig(setting.value)) {
+          this.logger.error(
+            '告警配置格式无效，请检查数据库中的配置是否被篡改，将使用默认配置',
+            setting.value,
+          );
+          // 继续执行以返回默认配置
+        } else {
+          return setting.value;
+        }
       }
     } catch (error) {
       this.logger.error('获取告警配置失败', error);

@@ -55,7 +55,7 @@ export interface AlertStats {
   _count: number;
 }
 
-export interface NotificationStatus {
+export interface EmailServiceStatus {
   emailAvailable: boolean;
   hasEmailConfig: boolean;
   emailConfig: Partial<EmailConfig> | null;
@@ -162,5 +162,5 @@ export const notificationApi = {
   /**
    * 获取通知服务状态
    */
-  getStatus: () => api.get<ApiResponse<NotificationStatus>>('/notifications/status'),
+  getStatus: () => api.get<ApiResponse<EmailServiceStatus>>('/notifications/status'),
 };
