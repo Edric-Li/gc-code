@@ -67,9 +67,15 @@ WORKDIR /app
 
 # 从后端构建阶段复制必要文件
 COPY --from=backend-builder /app/apps/backend/dist ./backend/dist
-COPY --from=backend-builder /app/apps/backend/node_modules ./backend/node_modules
 COPY --from=backend-builder /app/apps/backend/package.json ./backend/
 COPY --from=backend-builder /app/apps/backend/prisma ./backend/prisma
+
+# 安装生产依赖（使用 npm 而非 pnpm，避免 workspace 符号链接问题）
+WORKDIR /app/backend
+RUN npm install --omit=dev --ignore-scripts && \
+    npx prisma generate
+
+WORKDIR /app
 
 # 从前端构建阶段复制构建产物
 COPY --from=frontend-builder /app/apps/frontend/dist ./frontend/dist
