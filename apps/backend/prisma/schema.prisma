@@ -112,6 +112,11 @@ enum ProviderType {
   CUSTOM // 自定义
 }
 
+enum ChannelTargetType {
+  CHANNEL  // 具体渠道
+  PROVIDER // AI供货商
+}
+
 model User {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   username     String    @unique @db.VarChar(100)
@@ -277,6 +282,10 @@ model ApiKey {
   userId    String  @map("user_id") @db.Uuid
   channelId String? @map("channel_id") @db.Uuid // 关联渠道（null=自动选择）
 
+  // 渠道选择配置（新增）
+  channelTargetType ChannelTargetType @default(CHANNEL) @map("channel_target_type") // 渠道目标类型
+  providerId        String?           @map("provider_id") @db.Uuid // 关联供货商（targetType=PROVIDER时）
+
   // 基础信息
   name        String  @db.VarChar(255) // API Key 名称
   description String? @db.Text // API Key 描述
@@ -299,12 +308,15 @@ model ApiKey {
   // 关联关系
   user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   channel      Channel?           @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  provider     AiProvider?        @relation(fields: [providerId], references: [id], onDelete: SetNull)
   usageRecords ApiKeyUsage[]
   requestLogs  ApiKeyRequestLog[]
 
   @@unique([userId, name, deletedAt], name: "unique_user_apikey_name")
   @@index([userId], name: "idx_api_keys_user_id")
   @@index([channelId], name: "idx_api_keys_channel_id")
+  @@index([channelTargetType], name: "idx_api_keys_target_type")
+  @@index([providerId], name: "idx_api_keys_provider_id")
   @@index([key], name: "idx_api_keys_key")
   @@index([status], name: "idx_api_keys_status")
   @@index([expiresAt], name: "idx_api_keys_expires_at")
@@ -366,6 +378,7 @@ model AiProvider {
 
   channels Channel[]
   models   ProviderModel[]
+  apiKeys  ApiKey[] // API Keys 关联到供货商
 
   @@index([slug], name: "idx_ai_providers_slug")
   @@index([type], name: "idx_ai_providers_type")

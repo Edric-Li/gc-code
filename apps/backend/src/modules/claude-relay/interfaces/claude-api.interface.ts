@@ -84,6 +84,8 @@ export interface ApiKeyInfo {
   organizationId?: string;
   projectId?: string;
   channelId?: string;
+  channelTargetType?: 'CHANNEL' | 'PROVIDER';
+  providerId?: string;
   user?: {
     id: string;
     name: string;
