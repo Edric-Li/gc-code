@@ -39,6 +39,9 @@ SECURITY_AUDIT_REPORT.md
 # Experimental Dockerfiles
 Dockerfile.optimized
 
+# Deployment configs with secrets
+docker-compose.deploy.yml
+
 # Test and temporary files
 login.json
 test-request.json
