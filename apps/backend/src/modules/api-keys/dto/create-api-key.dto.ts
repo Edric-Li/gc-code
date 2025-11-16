@@ -7,9 +7,11 @@ import {
   IsUUID,
   IsEnum,
   MaxLength,
+  MinLength,
   IsPositive,
   ValidateIf,
   IsNotEmpty,
+  Matches,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ChannelTargetType } from '@prisma/client';
@@ -90,4 +92,15 @@ export class CreateApiKeyDto {
   })
   @IsOptional()
   providerId?: string;
+
+  @ApiPropertyOptional({
+    description: '自定义 API Key 值（仅管理员可用），如果不指定则自动生成。必须以 sk- 或 cr_ 开头，长度10-255字符',
+    example: 'sk-1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+  })
+  @IsString()
+  @IsOptional()
+  @MinLength(10, { message: 'Custom key must be at least 10 characters long' })
+  @MaxLength(255, { message: 'Custom key cannot exceed 255 characters' })
+  @Matches(/^(sk-|cr_)/, { message: 'Custom key must start with "sk-" or "cr_"' })
+  customKey?: string;
 }
