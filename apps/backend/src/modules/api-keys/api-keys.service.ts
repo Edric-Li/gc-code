@@ -85,8 +85,28 @@ export class ApiKeysService {
       );
     }
 
-    // 生成 API Key（明文存储）
-    const key = this.generateKey();
+    // 生成或使用自定义 API Key（明文存储）
+    let key: string;
+    if (createApiKeyDto.customKey) {
+      // 管理员指定了自定义 API Key，检查是否已存在（排除已删除的）
+      const existingKeyWithSameValue = await this.prisma.apiKey.findFirst({
+        where: {
+          key: createApiKeyDto.customKey,
+          deletedAt: null, // 排除已删除的 key
+        },
+      });
+
+      if (existingKeyWithSameValue) {
+        throw new BadRequestException(
+          'The provided custom API key already exists. Please use a different key.'
+        );
+      }
+
+      key = createApiKeyDto.customKey;
+    } else {
+      // 自动生成 API Key
+      key = this.generateKey();
+    }
 
     // 转换日期字符串
     const expiresAt = createApiKeyDto.expiresAt ? new Date(createApiKeyDto.expiresAt) : null;
