@@ -364,7 +364,7 @@ function ApiLogsList() {
                 <select
                   value={methodFilter}
                   onChange={(e) => {
-                    setMethodFilter(e.target.value);
+                    setMethodFilter(e.target.value as MethodFilter);
                     setPage(1);
                   }}
                   className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -384,7 +384,7 @@ function ApiLogsList() {
                 <select
                   value={statusFilter}
                   onChange={(e) => {
-                    setStatusFilter(e.target.value);
+                    setStatusFilter(e.target.value as StatusFilter);
                     setPage(1);
                   }}
                   className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
