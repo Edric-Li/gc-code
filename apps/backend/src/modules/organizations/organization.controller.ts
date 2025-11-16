@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
   Request,
+  Req,
 } from '@nestjs/common';
 import { OrganizationService } from './organization.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
@@ -18,17 +19,42 @@ import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { Role } from '@prisma/client';
+import { LogService } from '../logs/log.service';
+import { Role, AuditAction } from '@prisma/client';
+import { Request as ExpressRequest } from 'express';
 
 @Controller('organizations')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN) // 只有系统管理员可以管理组织
 export class OrganizationController {
-  constructor(private readonly organizationService: OrganizationService) {}
+  constructor(
+    private readonly organizationService: OrganizationService,
+    private readonly logService: LogService
+  ) {}
 
   @Post()
-  create(@Body() createDto: CreateOrganizationDto, @Request() req) {
-    return this.organizationService.create(createDto, req.user.id);
+  async create(
+    @Body() createDto: CreateOrganizationDto,
+    @Request() req,
+    @Req() expressReq: ExpressRequest
+  ) {
+    const result = await this.organizationService.create(createDto, req.user.id);
+
+    await this.logService.logAudit({
+      userId: req.user.id,
+      action: AuditAction.CREATE,
+      resource: 'Organization',
+      resourceId: result.id,
+      description: `创建组织: ${result.name}`,
+      changes: {
+        name: result.name,
+        slug: result.slug,
+      },
+      ipAddress: expressReq.ip || expressReq.socket.remoteAddress,
+      userAgent: expressReq.headers['user-agent'],
+    });
+
+    return result;
   }
 
   @Get()
@@ -54,32 +80,140 @@ export class OrganizationController {
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() updateDto: UpdateOrganizationDto, @Request() req) {
-    return this.organizationService.update(id, updateDto, req.user.id);
+  async update(
+    @Param('id') id: string,
+    @Body() updateDto: UpdateOrganizationDto,
+    @Request() req,
+    @Req() expressReq: ExpressRequest
+  ) {
+    const oldOrg = await this.organizationService.findOne(id);
+    const result = await this.organizationService.update(id, updateDto, req.user.id);
+
+    await this.logService.logAudit({
+      userId: req.user.id,
+      action: AuditAction.UPDATE,
+      resource: 'Organization',
+      resourceId: id,
+      description: `更新组织: ${oldOrg.name}`,
+      changes: {
+        before: { name: oldOrg.name, description: oldOrg.description },
+        after: { name: result.name, description: result.description },
+        fields: Object.keys(updateDto),
+      },
+      ipAddress: expressReq.ip || expressReq.socket.remoteAddress,
+      userAgent: expressReq.headers['user-agent'],
+    });
+
+    return result;
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string, @Request() req) {
-    return this.organizationService.remove(id, req.user.id);
+  async remove(@Param('id') id: string, @Request() req, @Req() expressReq: ExpressRequest) {
+    const org = await this.organizationService.findOne(id);
+    const result = await this.organizationService.remove(id, req.user.id);
+
+    await this.logService.logAudit({
+      userId: req.user.id,
+      action: AuditAction.DELETE,
+      resource: 'Organization',
+      resourceId: id,
+      description: `删除组织: ${org.name}`,
+      changes: {
+        deletedOrganization: { name: org.name, slug: org.slug },
+      },
+      ipAddress: expressReq.ip || expressReq.socket.remoteAddress,
+      userAgent: expressReq.headers['user-agent'],
+    });
+
+    return result;
   }
 
   @Post(':id/members')
-  addMember(@Param('id') id: string, @Body() addMemberDto: AddMemberDto, @Request() req) {
-    return this.organizationService.addMember(id, addMemberDto, req.user.id);
+  async addMember(
+    @Param('id') id: string,
+    @Body() addMemberDto: AddMemberDto,
+    @Request() req,
+    @Req() expressReq: ExpressRequest
+  ) {
+    const org = await this.organizationService.findOne(id);
+    const result = await this.organizationService.addMember(id, addMemberDto, req.user.id);
+
+    await this.logService.logAudit({
+      userId: req.user.id,
+      action: AuditAction.UPDATE,
+      resource: 'Organization',
+      resourceId: id,
+      description: `添加成员到组织: ${org.name}`,
+      changes: {
+        action: 'addMember',
+        userId: addMemberDto.userId,
+        isAdmin: addMemberDto.isAdmin,
+      },
+      ipAddress: expressReq.ip || expressReq.socket.remoteAddress,
+      userAgent: expressReq.headers['user-agent'],
+    });
+
+    return result;
   }
 
   @Put(':id/members/:memberId')
-  updateMemberRole(
+  async updateMemberRole(
     @Param('id') id: string,
     @Param('memberId') memberId: string,
     @Body() updateDto: UpdateMemberRoleDto,
-    @Request() req
+    @Request() req,
+    @Req() expressReq: ExpressRequest
   ) {
-    return this.organizationService.updateMemberRole(id, memberId, updateDto, req.user.id);
+    const org = await this.organizationService.findOne(id);
+    const result = await this.organizationService.updateMemberRole(
+      id,
+      memberId,
+      updateDto,
+      req.user.id
+    );
+
+    await this.logService.logAudit({
+      userId: req.user.id,
+      action: AuditAction.UPDATE,
+      resource: 'Organization',
+      resourceId: id,
+      description: `更新组织成员角色: ${org.name}`,
+      changes: {
+        action: 'updateMemberRole',
+        memberId,
+        newRole: updateDto.role,
+      },
+      ipAddress: expressReq.ip || expressReq.socket.remoteAddress,
+      userAgent: expressReq.headers['user-agent'],
+    });
+
+    return result;
   }
 
   @Delete(':id/members/:memberId')
-  removeMember(@Param('id') id: string, @Param('memberId') memberId: string, @Request() req) {
-    return this.organizationService.removeMember(id, memberId, req.user.id);
+  async removeMember(
+    @Param('id') id: string,
+    @Param('memberId') memberId: string,
+    @Request() req,
+    @Req() expressReq: ExpressRequest
+  ) {
+    const org = await this.organizationService.findOne(id);
+    const result = await this.organizationService.removeMember(id, memberId, req.user.id);
+
+    await this.logService.logAudit({
+      userId: req.user.id,
+      action: AuditAction.UPDATE,
+      resource: 'Organization',
+      resourceId: id,
+      description: `从组织移除成员: ${org.name}`,
+      changes: {
+        action: 'removeMember',
+        memberId,
+      },
+      ipAddress: expressReq.ip || expressReq.socket.remoteAddress,
+      userAgent: expressReq.headers['user-agent'],
+    });
+
+    return result;
   }
 }

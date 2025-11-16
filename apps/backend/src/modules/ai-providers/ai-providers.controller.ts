@@ -10,6 +10,8 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Request,
+  Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AiProvidersService } from './ai-providers.service';
@@ -23,14 +25,19 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { Role } from '@prisma/client';
+import { LogService } from '../logs/log.service';
+import { Role, AuditAction } from '@prisma/client';
+import { Request as ExpressRequest } from 'express';
 
 @ApiTags('AI Providers')
 @Controller('ai-providers')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class AiProvidersController {
-  constructor(private readonly aiProvidersService: AiProvidersService) {}
+  constructor(
+    private readonly aiProvidersService: AiProvidersService,
+    private readonly logService: LogService
+  ) {}
 
   @Post()
   @Roles(Role.ADMIN)
@@ -41,8 +48,28 @@ export class AiProvidersController {
     type: AiProviderResponseEntity,
   })
   @ApiResponse({ status: HttpStatus.CONFLICT, description: 'Slug 已存在' })
-  async create(@Body() dto: CreateAiProviderDto): Promise<AiProviderResponseEntity> {
-    return this.aiProvidersService.create(dto);
+  async create(
+    @Body() dto: CreateAiProviderDto,
+    @Request() req,
+    @Req() expressReq: ExpressRequest
+  ): Promise<AiProviderResponseEntity> {
+    const result = await this.aiProvidersService.create(dto);
+
+    await this.logService.logAudit({
+      userId: req.user.id,
+      action: AuditAction.CREATE,
+      resource: 'AiProvider',
+      resourceId: result.id,
+      description: `创建 AI 提供商: ${result.name}`,
+      changes: {
+        name: result.name,
+        slug: result.slug,
+      },
+      ipAddress: expressReq.ip || expressReq.socket.remoteAddress,
+      userAgent: expressReq.headers['user-agent'],
+    });
+
+    return result;
   }
 
   @Get()
@@ -83,9 +110,29 @@ export class AiProvidersController {
   })
   async update(
     @Param('id') id: string,
-    @Body() dto: UpdateAiProviderDto
+    @Body() dto: UpdateAiProviderDto,
+    @Request() req,
+    @Req() expressReq: ExpressRequest
   ): Promise<AiProviderResponseEntity> {
-    return this.aiProvidersService.update(id, dto);
+    const oldProvider = await this.aiProvidersService.findOne(id);
+    const result = await this.aiProvidersService.update(id, dto);
+
+    await this.logService.logAudit({
+      userId: req.user.id,
+      action: AuditAction.UPDATE,
+      resource: 'AiProvider',
+      resourceId: id,
+      description: `更新 AI 提供商: ${oldProvider.name}`,
+      changes: {
+        before: { name: oldProvider.name, isActive: oldProvider.isActive },
+        after: { name: result.name, isActive: result.isActive },
+        fields: Object.keys(dto),
+      },
+      ipAddress: expressReq.ip || expressReq.socket.remoteAddress,
+      userAgent: expressReq.headers['user-agent'],
+    });
+
+    return result;
   }
 
   @Delete(':id')
@@ -98,7 +145,25 @@ export class AiProvidersController {
     status: HttpStatus.BAD_REQUEST,
     description: '不允许删除预置提供商或有关联渠道的提供商',
   })
-  async remove(@Param('id') id: string): Promise<void> {
-    return this.aiProvidersService.remove(id);
+  async remove(
+    @Param('id') id: string,
+    @Request() req,
+    @Req() expressReq: ExpressRequest
+  ): Promise<void> {
+    const provider = await this.aiProvidersService.findOne(id);
+    await this.aiProvidersService.remove(id);
+
+    await this.logService.logAudit({
+      userId: req.user.id,
+      action: AuditAction.DELETE,
+      resource: 'AiProvider',
+      resourceId: id,
+      description: `删除 AI 提供商: ${provider.name}`,
+      changes: {
+        deletedProvider: { name: provider.name, slug: provider.slug },
+      },
+      ipAddress: expressReq.ip || expressReq.socket.remoteAddress,
+      userAgent: expressReq.headers['user-agent'],
+    });
   }
 }

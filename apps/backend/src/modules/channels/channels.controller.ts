@@ -10,6 +10,8 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Request,
+  Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ChannelsService } from './channels.service';
@@ -23,14 +25,19 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { Role } from '@prisma/client';
+import { LogService } from '../logs/log.service';
+import { Role, AuditAction } from '@prisma/client';
+import { Request as ExpressRequest } from 'express';
 
 @ApiTags('Channels')
 @Controller('channels')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class ChannelsController {
-  constructor(private readonly channelsService: ChannelsService) {}
+  constructor(
+    private readonly channelsService: ChannelsService,
+    private readonly logService: LogService
+  ) {}
 
   @Post()
   @Roles(Role.ADMIN)
@@ -41,8 +48,28 @@ export class ChannelsController {
     type: ChannelResponseEntity,
   })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'AI 提供商不存在' })
-  async create(@Body() dto: CreateChannelDto): Promise<ChannelResponseEntity> {
-    return this.channelsService.create(dto);
+  async create(
+    @Body() dto: CreateChannelDto,
+    @Request() req,
+    @Req() expressReq: ExpressRequest
+  ): Promise<ChannelResponseEntity> {
+    const result = await this.channelsService.create(dto);
+
+    await this.logService.logAudit({
+      userId: req.user.id,
+      action: AuditAction.CREATE,
+      resource: 'Channel',
+      resourceId: result.id,
+      description: `创建渠道: ${result.name}`,
+      changes: {
+        name: result.name,
+        providerId: dto.providerId,
+      },
+      ipAddress: expressReq.ip || expressReq.socket.remoteAddress,
+      userAgent: expressReq.headers['user-agent'],
+    });
+
+    return result;
   }
 
   @Get()
@@ -79,9 +106,29 @@ export class ChannelsController {
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: '渠道不存在' })
   async update(
     @Param('id') id: string,
-    @Body() dto: UpdateChannelDto
+    @Body() dto: UpdateChannelDto,
+    @Request() req,
+    @Req() expressReq: ExpressRequest
   ): Promise<ChannelResponseEntity> {
-    return this.channelsService.update(id, dto);
+    const oldChannel = await this.channelsService.findOne(id);
+    const result = await this.channelsService.update(id, dto);
+
+    await this.logService.logAudit({
+      userId: req.user.id,
+      action: AuditAction.UPDATE,
+      resource: 'Channel',
+      resourceId: id,
+      description: `更新渠道: ${oldChannel.name}`,
+      changes: {
+        before: { name: oldChannel.name, status: oldChannel.status },
+        after: { name: result.name, status: result.status },
+        fields: Object.keys(dto),
+      },
+      ipAddress: expressReq.ip || expressReq.socket.remoteAddress,
+      userAgent: expressReq.headers['user-agent'],
+    });
+
+    return result;
   }
 
   @Delete(':id')
@@ -94,8 +141,26 @@ export class ChannelsController {
     status: HttpStatus.BAD_REQUEST,
     description: '不允许删除有关联 API Key 的渠道',
   })
-  async remove(@Param('id') id: string): Promise<void> {
-    return this.channelsService.remove(id);
+  async remove(
+    @Param('id') id: string,
+    @Request() req,
+    @Req() expressReq: ExpressRequest
+  ): Promise<void> {
+    const channel = await this.channelsService.findOne(id);
+    await this.channelsService.remove(id);
+
+    await this.logService.logAudit({
+      userId: req.user.id,
+      action: AuditAction.DELETE,
+      resource: 'Channel',
+      resourceId: id,
+      description: `删除渠道: ${channel.name}`,
+      changes: {
+        deletedChannel: { name: channel.name },
+      },
+      ipAddress: expressReq.ip || expressReq.socket.remoteAddress,
+      userAgent: expressReq.headers['user-agent'],
+    });
   }
 
   @Post(':id/test')

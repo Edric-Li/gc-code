@@ -11,6 +11,7 @@ import {
   Request,
   HttpCode,
   HttpStatus,
+  Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { ApiKeysService } from './api-keys.service';
@@ -32,14 +33,19 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { Role } from '@prisma/client';
+import { LogService } from '../logs/log.service';
+import { Role, AuditAction } from '@prisma/client';
+import { Request as ExpressRequest } from 'express';
 
 @ApiTags('API Keys')
 @Controller('api-keys')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class ApiKeysController {
-  constructor(private readonly apiKeysService: ApiKeysService) {}
+  constructor(
+    private readonly apiKeysService: ApiKeysService,
+    private readonly logService: LogService
+  ) {}
 
   @Post()
   @UseGuards(RolesGuard)
@@ -53,8 +59,29 @@ export class ApiKeysController {
   @ApiResponse({ status: 400, description: '请求参数错误' })
   @ApiResponse({ status: 401, description: '未授权' })
   @ApiResponse({ status: 403, description: '权限不足' })
-  create(@Body() createApiKeyDto: CreateApiKeyDto, @Request() req): Promise<ApiKeyResponseEntity> {
-    return this.apiKeysService.create(req.user.id, createApiKeyDto);
+  async create(
+    @Body() createApiKeyDto: CreateApiKeyDto,
+    @Request() req,
+    @Req() expressReq: ExpressRequest
+  ): Promise<ApiKeyResponseEntity> {
+    const result = await this.apiKeysService.create(req.user.id, createApiKeyDto);
+
+    // 记录审计日志
+    await this.logService.logAudit({
+      userId: req.user.id,
+      action: AuditAction.CREATE,
+      resource: 'ApiKey',
+      resourceId: result.id,
+      description: `创建 API Key: ${result.name}`,
+      changes: {
+        name: result.name,
+        targetUserId: createApiKeyDto.userId,
+      },
+      ipAddress: expressReq.ip || expressReq.socket.remoteAddress,
+      userAgent: expressReq.headers['user-agent'],
+    });
+
+    return result;
   }
 
   @Post('my-keys')
@@ -68,14 +95,31 @@ export class ApiKeysController {
   @ApiResponse({ status: 401, description: '未授权' })
   async createMyKey(
     @Body() createDto: Omit<CreateApiKeyDto, 'userId'>,
-    @Request() req
+    @Request() req,
+    @Req() expressReq: ExpressRequest
   ): Promise<ApiKeyResponseEntity> {
     // 自动填充 userId 为当前用户
     const createApiKeyDto: CreateApiKeyDto = {
       ...createDto,
       userId: req.user.id,
     };
-    return this.apiKeysService.createForUser(req.user.id, createApiKeyDto);
+    const result = await this.apiKeysService.createForUser(req.user.id, createApiKeyDto);
+
+    // 记录审计日志
+    await this.logService.logAudit({
+      userId: req.user.id,
+      action: AuditAction.CREATE,
+      resource: 'ApiKey',
+      resourceId: result.id,
+      description: `创建个人 API Key: ${result.name}`,
+      changes: {
+        name: result.name,
+      },
+      ipAddress: expressReq.ip || expressReq.socket.remoteAddress,
+      userAgent: expressReq.headers['user-agent'],
+    });
+
+    return result;
   }
 
   @Get()
@@ -228,12 +272,32 @@ export class ApiKeysController {
     type: ApiKeyResponseEntity,
   })
   @ApiResponse({ status: 404, description: 'API Key 不存在' })
-  update(
+  async update(
     @Param('id') id: string,
     @Body() updateApiKeyDto: UpdateApiKeyDto,
-    @Request() req
+    @Request() req,
+    @Req() expressReq: ExpressRequest
   ): Promise<ApiKeyResponseEntity> {
-    return this.apiKeysService.update(id, req.user.id, updateApiKeyDto);
+    const oldApiKey = await this.apiKeysService.findOne(id, req.user.id);
+    const result = await this.apiKeysService.update(id, req.user.id, updateApiKeyDto);
+
+    // 记录审计日志
+    await this.logService.logAudit({
+      userId: req.user.id,
+      action: AuditAction.UPDATE,
+      resource: 'ApiKey',
+      resourceId: id,
+      description: `更新 API Key: ${oldApiKey.name}`,
+      changes: {
+        before: { name: oldApiKey.name, description: oldApiKey.description },
+        after: { name: result.name, description: result.description },
+        fields: Object.keys(updateApiKeyDto),
+      },
+      ipAddress: expressReq.ip || expressReq.socket.remoteAddress,
+      userAgent: expressReq.headers['user-agent'],
+    });
+
+    return result;
   }
 
   @Delete(':id')
@@ -252,8 +316,25 @@ export class ApiKeysController {
     },
   })
   @ApiResponse({ status: 404, description: 'API Key 不存在' })
-  remove(@Param('id') id: string, @Request() req) {
-    return this.apiKeysService.softDelete(id, req.user.id);
+  async remove(@Param('id') id: string, @Request() req, @Req() expressReq: ExpressRequest) {
+    const apiKey = await this.apiKeysService.findOne(id, req.user.id);
+    const result = await this.apiKeysService.softDelete(id, req.user.id);
+
+    // 记录审计日志
+    await this.logService.logAudit({
+      userId: req.user.id,
+      action: AuditAction.DELETE,
+      resource: 'ApiKey',
+      resourceId: id,
+      description: `删除 API Key: ${apiKey.name}`,
+      changes: {
+        deletedApiKey: { name: apiKey.name, key: apiKey.key },
+      },
+      ipAddress: expressReq.ip || expressReq.socket.remoteAddress,
+      userAgent: expressReq.headers['user-agent'],
+    });
+
+    return result;
   }
 
   @Post(':id/revoke')
@@ -274,8 +355,27 @@ export class ApiKeysController {
     },
   })
   @ApiResponse({ status: 404, description: 'API Key 不存在' })
-  revoke(@Param('id') id: string, @Request() req) {
-    return this.apiKeysService.revoke(id, req.user.id);
+  async revoke(@Param('id') id: string, @Request() req, @Req() expressReq: ExpressRequest) {
+    const apiKey = await this.apiKeysService.findOne(id, req.user.id);
+    const result = await this.apiKeysService.revoke(id, req.user.id);
+
+    // 记录审计日志
+    await this.logService.logAudit({
+      userId: req.user.id,
+      action: AuditAction.UPDATE,
+      resource: 'ApiKey',
+      resourceId: id,
+      description: `撤销 API Key: ${apiKey.name}`,
+      changes: {
+        action: 'revoke',
+        previousStatus: apiKey.status,
+        newStatus: 'REVOKED',
+      },
+      ipAddress: expressReq.ip || expressReq.socket.remoteAddress,
+      userAgent: expressReq.headers['user-agent'],
+    });
+
+    return result;
   }
 
   @Post(':id/restore')
@@ -296,8 +396,27 @@ export class ApiKeysController {
   })
   @ApiResponse({ status: 404, description: 'API Key 不存在' })
   @ApiResponse({ status: 400, description: 'API Key 未被删除' })
-  restore(@Param('id') id: string, @Request() req) {
-    return this.apiKeysService.restore(id, req.user.id);
+  async restore(@Param('id') id: string, @Request() req, @Req() expressReq: ExpressRequest) {
+    const apiKey = await this.apiKeysService.findOne(id, req.user.id);
+    const result = await this.apiKeysService.restore(id, req.user.id);
+
+    // 记录审计日志
+    await this.logService.logAudit({
+      userId: req.user.id,
+      action: AuditAction.UPDATE,
+      resource: 'ApiKey',
+      resourceId: id,
+      description: `恢复 API Key: ${apiKey.name}`,
+      changes: {
+        action: 'restore',
+        previousStatus: apiKey.status,
+        newStatus: 'ACTIVE',
+      },
+      ipAddress: expressReq.ip || expressReq.socket.remoteAddress,
+      userAgent: expressReq.headers['user-agent'],
+    });
+
+    return result;
   }
 
   @Get('check-name/:userId/:name')
