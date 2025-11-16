@@ -79,12 +79,12 @@ export default function AiProviders() {
   const totalPages = Math.ceil(total / limit);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">AI 提供商管理</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">管理 AI 模型提供商配置</p>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">AI 提供商管理</h2>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">管理 AI 模型提供商配置</p>
         </div>
         <button
           onClick={() => setShowCreateDialog(true)}

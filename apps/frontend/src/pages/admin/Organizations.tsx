@@ -325,8 +325,8 @@ export default function Organizations() {
       {/* 页面头部 */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">组织管理</h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">管理组织和成员</p>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">组织管理</h2>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">管理组织和成员</p>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
