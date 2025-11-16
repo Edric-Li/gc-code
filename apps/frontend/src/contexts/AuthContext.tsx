@@ -89,9 +89,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const loginWithAzure = useCallback(() => {
-    // Azure 登录需要完整 URL 进行重定向，因此使用绝对路径
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5555/api';
-    window.location.href = `${apiUrl}/auth/azure`;
+    // 使用相对路径，由 nginx 代理到后端
+    window.location.href = '/api/auth/azure';
   }, []);
 
   const setAuthData = useCallback((token: string, user: User) => {
