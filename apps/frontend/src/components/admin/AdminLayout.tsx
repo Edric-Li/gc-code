@@ -12,6 +12,8 @@ import {
   Brain,
   Network,
   Home,
+  Bell,
+  Mail,
 } from 'lucide-react';
 import { useState } from 'react';
 import Logo from '../common/Logo';
@@ -23,6 +25,8 @@ const navigation = [
   { name: 'API Key', href: '/admin/api-keys', icon: Key },
   { name: 'AI 提供商', href: '/admin/ai-providers', icon: Brain },
   { name: '渠道管理', href: '/admin/channels', icon: Network },
+  { name: '通知配置', href: '/admin/notifications', icon: Mail },
+  { name: '告警历史', href: '/admin/alerts', icon: Bell },
   { name: '日志查看', href: '/admin/logs', icon: FileText },
 ];
 
