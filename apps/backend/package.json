@@ -1,5 +1,5 @@
 {
-  "name": "gc-code-backend",
+  "name": "@gc-code/backend",
   "version": "1.0.0",
   "description": "GC Code Portal Backend",
   "main": "dist/main.js",

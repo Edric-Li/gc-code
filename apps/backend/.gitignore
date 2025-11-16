@@ -41,6 +41,7 @@ lerna-debug.log*
 
 # Prisma
 prisma/migrations/*/migration.sql
+
 # Test files
 *.test.js
 test-*.js

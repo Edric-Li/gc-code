@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  gc-code-portal:
+    image: edric-li/gc-code-portal:latest
+    container_name: gc-code-portal
+    ports:
+      - "80:80"
+      - "5555:5555"
+    env_file:
+      - .env
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

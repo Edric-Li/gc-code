@@ -30,3 +30,27 @@ dist-ssr
 .env.local
 .env.production
 .playwright-mcp/
+
+# Temporary reports and audit files
+*_REPORT.md
+*_SUMMARY.md
+SECURITY_AUDIT_REPORT.md
+
+# Experimental Dockerfiles
+Dockerfile.optimized
+
+# Test and temporary files
+login.json
+test-request.json
+test-*.json
+*.test.js
+test-*.js
+test-*.sh
+
+# Backend specific logs
+apps/backend/logs/
+apps/backend/*.log
+
+# Lock files (use pnpm-lock.yaml instead)
+package-lock.json
+apps/backend/package-lock.json

@@ -5,17 +5,22 @@ FROM node:20-alpine AS frontend-builder
 
 WORKDIR /app
 
-# 复制前端 package 文件
-COPY package*.json ./
+# 安装 pnpm
+RUN npm install -g pnpm
+
+# 复制 workspace 配置文件
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY apps/frontend/package.json ./apps/frontend/
 
 # 安装前端依赖
-RUN npm ci --legacy-peer-deps
+RUN pnpm install --frozen-lockfile --filter @gc-code/frontend
 
 # 复制前端源代码
-COPY . .
+COPY apps/frontend/ ./apps/frontend/
 
 # 构建前端应用
-RUN npm run build:frontend
+WORKDIR /app/apps/frontend
+RUN pnpm run build
 
 # ================================
 # 多阶段构建 - 后端构建阶段
@@ -28,7 +33,7 @@ RUN apk add --no-cache openssl
 WORKDIR /app
 
 # 复制后端 package 文件
-COPY backend/package*.json ./
+COPY apps/backend/package*.json ./
 
 # 安装后端依赖（包括 devDependencies 用于构建）
 # 设置 npm 超时和重试次数
@@ -37,7 +42,7 @@ RUN npm config set fetch-retry-mintimeout 20000 && \
     npm ci
 
 # 复制后端源代码和 Prisma schema
-COPY backend/ ./
+COPY apps/backend/ ./
 
 # 生成 Prisma Client
 RUN npx prisma generate
@@ -65,7 +70,7 @@ COPY --from=backend-builder /app/package*.json ./backend/
 COPY --from=backend-builder /app/prisma ./backend/prisma
 
 # 从前端构建阶段复制构建产物
-COPY --from=frontend-builder /app/dist ./frontend/dist
+COPY --from=frontend-builder /app/apps/frontend/dist ./frontend/dist
 
 # 复制 nginx 配置
 COPY nginx-fullstack.conf /etc/nginx/http.d/default.conf
