@@ -26,11 +26,7 @@ export interface ISessionStorageService {
   /**
    * 设置会话映射
    */
-  setMapping(
-    sessionHash: string,
-    channelId: string,
-    apiKeyId: string,
-  ): Promise<SessionMapping>;
+  setMapping(sessionHash: string, channelId: string, apiKeyId: string): Promise<SessionMapping>;
 
   /**
    * 更新会话映射（增加请求计数）

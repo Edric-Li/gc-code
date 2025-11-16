@@ -16,25 +16,15 @@ export class SessionHashService {
   /**
    * 生成会话哈希
    */
-  generateHash(
-    messages: ClaudeMessage[],
-    options: SessionHashOptions = {},
-  ): string {
+  generateHash(messages: ClaudeMessage[], options: SessionHashOptions = {}): string {
     if (!Array.isArray(messages) || messages.length === 0) {
       throw new BadRequestException('Messages array cannot be empty');
     }
 
-    const {
-      messageCount = this.DEFAULT_MESSAGE_COUNT,
-      includeSystemPrompt = false,
-    } = options;
+    const { messageCount = this.DEFAULT_MESSAGE_COUNT, includeSystemPrompt = false } = options;
 
     // 提取内容
-    const content = this.extractHashContent(
-      messages,
-      messageCount,
-      includeSystemPrompt,
-    );
+    const content = this.extractHashContent(messages, messageCount, includeSystemPrompt);
 
     // 生成哈希
     return this.computeHash(content);
@@ -46,10 +36,10 @@ export class SessionHashService {
   private extractHashContent(
     messages: ClaudeMessage[],
     messageCount: number,
-    includeSystemPrompt: boolean,
+    includeSystemPrompt: boolean
   ): string {
     // 过滤消息
-    let filteredMessages = messages;
+    const filteredMessages = messages;
 
     // Note: In Claude API, system prompts are passed separately, not as messages
     // All messages in the array should be either 'user' or 'assistant'
@@ -84,10 +74,7 @@ export class SessionHashService {
    * 计算哈希值
    */
   private computeHash(content: string): string {
-    const hash = crypto
-      .createHash(this.HASH_ALGORITHM)
-      .update(content)
-      .digest('hex');
+    const hash = crypto.createHash(this.HASH_ALGORITHM).update(content).digest('hex');
 
     return hash.substring(0, this.HASH_LENGTH);
   }

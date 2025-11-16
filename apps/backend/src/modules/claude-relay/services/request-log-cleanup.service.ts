@@ -64,14 +64,9 @@ export class RequestLogCleanupService implements OnModuleInit {
         }
       }
 
-      this.logger.log(
-        `✅ Request log cleanup completed: ${totalDeleted} logs deleted`
-      );
+      this.logger.log(`✅ Request log cleanup completed: ${totalDeleted} logs deleted`);
     } catch (error) {
-      this.logger.error(
-        `❌ Request log cleanup failed: ${error.message}`,
-        error.stack
-      );
+      this.logger.error(`❌ Request log cleanup failed: ${error.message}`, error.stack);
     }
   }
 

@@ -213,7 +213,8 @@ export class AiProvidersService {
           description: dto.description,
           isActive: dto.isActive,
           sortOrder: dto.sortOrder,
-          metadata: dto.metadata !== undefined ? (dto.metadata as Prisma.InputJsonValue) : undefined,
+          metadata:
+            dto.metadata !== undefined ? (dto.metadata as Prisma.InputJsonValue) : undefined,
         },
         include: {
           models: true,

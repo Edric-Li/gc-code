@@ -1,10 +1,6 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  ISessionStorageService,
-  SessionMapping,
-  SessionStats,
-} from './session-storage.interface';
+import { ISessionStorageService, SessionMapping, SessionStats } from './session-storage.interface';
 
 /**
  * 基于内存的 Session 存储实现
@@ -30,10 +26,7 @@ export class MemorySessionStorageService
   constructor(private configService: ConfigService) {
     // 加载配置
     this.ttlSeconds = this.configService.get('SESSION_TTL_SECONDS', 3600);
-    this.renewThresholdSeconds = this.configService.get(
-      'SESSION_RENEW_THRESHOLD_SECONDS',
-      300,
-    );
+    this.renewThresholdSeconds = this.configService.get('SESSION_RENEW_THRESHOLD_SECONDS', 300);
     this.maxCacheSize = this.configService.get('SESSION_MAX_CACHE_SIZE', 10000);
   }
 
@@ -81,7 +74,7 @@ export class MemorySessionStorageService
   async setMapping(
     sessionHash: string,
     channelId: string,
-    apiKeyId: string,
+    apiKeyId: string
   ): Promise<SessionMapping> {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + this.ttlSeconds * 1000);
@@ -104,7 +97,7 @@ export class MemorySessionStorageService
     this.cache.set(sessionHash, mapping);
 
     this.logger.log(
-      `Created session mapping: ${sessionHash} → ${channelId} (TTL: ${this.ttlSeconds}s)`,
+      `Created session mapping: ${sessionHash} → ${channelId} (TTL: ${this.ttlSeconds}s)`
     );
 
     return mapping;
@@ -132,9 +125,7 @@ export class MemorySessionStorageService
 
     this.cache.set(sessionHash, mapping);
 
-    this.logger.debug(
-      `Updated session mapping: ${sessionHash} (count: ${mapping.requestCount})`,
-    );
+    this.logger.debug(`Updated session mapping: ${sessionHash} (count: ${mapping.requestCount})`);
   }
 
   /**
@@ -157,13 +148,13 @@ export class MemorySessionStorageService
       this.cache.set(sessionHash, mapping);
 
       this.logger.log(
-        `Renewed session mapping: ${sessionHash} (was ${remainingSeconds}s, now ${this.ttlSeconds}s)`,
+        `Renewed session mapping: ${sessionHash} (was ${remainingSeconds}s, now ${this.ttlSeconds}s)`
       );
       return true;
     }
 
     this.logger.debug(
-      `Session mapping TTL sufficient: ${sessionHash} (${remainingSeconds}s remaining)`,
+      `Session mapping TTL sufficient: ${sessionHash} (${remainingSeconds}s remaining)`
     );
     return false;
   }
@@ -187,8 +178,7 @@ export class MemorySessionStorageService
 
     return {
       totalSessions: mappings.length,
-      avgRequestsPerSession:
-        mappings.length > 0 ? totalRequests / mappings.length : 0,
+      avgRequestsPerSession: mappings.length > 0 ? totalRequests / mappings.length : 0,
     };
   }
 

@@ -84,7 +84,7 @@ describe('MemorySessionStorageService', () => {
       await service.setMapping(sessionHash, 'channel1', 'key1');
 
       // 等待一小段时间
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       await service.updateMapping(sessionHash);
       await service.updateMapping(sessionHash);
@@ -240,21 +240,21 @@ describe('MemorySessionStorageService', () => {
       }).compile();
 
       const smallCacheService = smallCacheModule.get<MemorySessionStorageService>(
-        MemorySessionStorageService,
+        MemorySessionStorageService
       );
       smallCacheService.onModuleInit();
 
       // 添加3个会话（填满缓存）
       await smallCacheService.setMapping('hash1', 'channel1', 'key1');
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       await smallCacheService.setMapping('hash2', 'channel2', 'key2');
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       await smallCacheService.setMapping('hash3', 'channel3', 'key3');
 
       expect(smallCacheService.getCacheSize()).toBe(3);
 
       // 添加第4个会话，应该淘汰最早的
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       await smallCacheService.setMapping('hash4', 'channel4', 'key4');
 
       expect(smallCacheService.getCacheSize()).toBe(3);

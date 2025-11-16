@@ -8,7 +8,10 @@
     "pnpm --filter @gc-code/frontend exec prettier --write"
   ],
   "apps/frontend/**/*.{json,md}": ["pnpm --filter @gc-code/frontend exec prettier --write"],
-  "apps/backend/**/*.{ts,js}": ["pnpm --filter @gc-code/backend exec prettier --write"],
+  "apps/backend/**/*.{ts,js}": [
+    "pnpm --filter @gc-code/backend exec eslint --fix",
+    "pnpm --filter @gc-code/backend exec prettier --write"
+  ],
   "apps/backend/**/*.{json,md}": ["pnpm --filter @gc-code/backend exec prettier --write"],
   "*.{json,md,yaml,yml}": ["prettier --write --ignore-unknown"]
 }
