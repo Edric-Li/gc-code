@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './common/prisma.module';
 import { HealthModule } from './modules/health/health.module';
@@ -10,6 +10,7 @@ import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 import { AiProvidersModule } from './modules/ai-providers/ai-providers.module';
 import { ChannelsModule } from './modules/channels/channels.module';
 import { ClaudeRelayModule } from './modules/claude-relay/claude-relay.module';
+import { ApiLogMiddleware } from './modules/logs/api-log.middleware';
 import { NotificationModule } from './modules/notification/notification.module';
 
 @Module({
@@ -56,4 +57,8 @@ import { NotificationModule } from './modules/notification/notification.module';
   controllers: [],
   providers: [],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(ApiLogMiddleware).forRoutes('*'); // 应用到所有路由
+  }
+}

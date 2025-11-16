@@ -82,20 +82,19 @@ export class EmailNotificationService {
         try {
           config.password = decryptApiKey(config.password);
         } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : '未知错误';
+          const errorMessage = error instanceof Error ? error.message : '未知错误';
           // 记录加密密码的前8个字符（用于调试）
           const passwordPrefix = config.password.substring(0, 8);
           this.logger.error(
             `解密邮件密码失败，配置可能已损坏或加密密钥已更改 (密码前缀: ${passwordPrefix}...): ${errorMessage}`,
-            error,
+            error
           );
           return null; // 解密失败应该返回 null，避免使用错误的密码
         }
       } else {
         // 明文密码（旧数据或首次配置）
         this.logger.warn(
-          '检测到明文邮件密码，建议重新保存配置以加密存储。密码将在下次保存时自动加密。',
+          '检测到明文邮件密码，建议重新保存配置以加密存储。密码将在下次保存时自动加密。'
         );
       }
 
@@ -132,7 +131,7 @@ export class EmailNotificationService {
   async sendEmail(
     options: SendEmailOptions,
     maxRetries: number = 3,
-    timeout: number = 30000,
+    timeout: number = 30000
   ): Promise<boolean> {
     if (!this.transporter || !this.currentConfig) {
       this.logger.warn('邮件服务未配置，跳过发送');
@@ -153,30 +152,26 @@ export class EmailNotificationService {
         // 添加超时控制
         const sendPromise = this.transporter.sendMail(mailOptions);
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('邮件发送超时')), timeout),
+          setTimeout(() => reject(new Error('邮件发送超时')), timeout)
         );
 
         const info = await Promise.race([sendPromise, timeoutPromise]);
         this.logger.log(
-          `邮件发送成功: ${info.messageId}${attempt > 1 ? ` (重试第 ${attempt - 1} 次后成功)` : ''}`,
+          `邮件发送成功: ${info.messageId}${attempt > 1 ? ` (重试第 ${attempt - 1} 次后成功)` : ''}`
         );
         return true;
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : '未知错误';
+        const errorMessage = error instanceof Error ? error.message : '未知错误';
 
         if (attempt === maxRetries) {
-          this.logger.error(
-            `邮件发送失败（已重试 ${maxRetries - 1} 次）: ${errorMessage}`,
-            error,
-          );
+          this.logger.error(`邮件发送失败（已重试 ${maxRetries - 1} 次）: ${errorMessage}`, error);
           return false;
         }
 
         // 指数退避：第1次重试等待2秒，第2次等待4秒
         const delayMs = Math.pow(2, attempt) * 1000;
         this.logger.warn(
-          `邮件发送失败（第 ${attempt} 次尝试），${delayMs / 1000} 秒后重试: ${errorMessage}`,
+          `邮件发送失败（第 ${attempt} 次尝试），${delayMs / 1000} 秒后重试: ${errorMessage}`
         );
         await this.delay(delayMs);
       }
@@ -222,8 +217,7 @@ export class EmailNotificationService {
         message: '邮件服务器连接成功',
       };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : '未知错误';
+      const errorMessage = error instanceof Error ? error.message : '未知错误';
       return {
         success: false,
         message: `连接失败: ${errorMessage}`,

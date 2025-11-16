@@ -20,7 +20,7 @@ export class ClaudeProxyService {
   constructor(
     private httpService: HttpService,
     private channelSelector: ClaudeChannelSelectorService,
-    private alertService: ChannelAlertService,
+    private alertService: ChannelAlertService
   ) {}
 
   /**
@@ -223,7 +223,9 @@ export class ClaudeProxyService {
     // 401, 403: 认证失败（永久性错误）
     else if (status === 401 || status === 403) {
       await this.channelSelector.markChannelError(channel.id);
-      this.logger.error(`Channel ${channel.name} authentication failed (${status}) - marked as ERROR`);
+      this.logger.error(
+        `Channel ${channel.name} authentication failed (${status}) - marked as ERROR`
+      );
 
       // 发送认证失败告警
       await this.alertService.sendAlert(channel, AlertType.ERROR, {

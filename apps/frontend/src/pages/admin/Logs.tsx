@@ -234,21 +234,47 @@ function AuditLogsList() {
 }
 
 // API 日志列表
+type MethodFilter = 'all' | 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+type StatusFilter = 'all' | '2' | '3' | '4' | '5';
+
 function ApiLogsList() {
   const [logs, setLogs] = useState<ApiLog[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [methodFilter, setMethodFilter] = useState<MethodFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [pathFilter, setPathFilter] = useState('');
+  const [debouncedPath, setDebouncedPath] = useState('');
+  const [isFilterExpanded, setIsFilterExpanded] = useState(false);
   const pageSize = 20;
+
+  // 防抖处理路径搜索
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPath(pathFilter);
+      setPage(1); // 重置到第一页
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [pathFilter]);
 
   const loadLogs = async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await logApi.getApiLogs({
-        skip: 0,
+        skip: (page - 1) * pageSize,
         take: pageSize,
+        method: methodFilter !== 'all' ? methodFilter : undefined,
+        statusCode: statusFilter !== 'all' ? parseInt(statusFilter) : undefined,
+        path: debouncedPath || undefined,
       });
       setLogs(response.data);
+      setTotal(response.total || 0);
     } catch (err) {
       console.error('加载 API 日志失败:', err);
+      setError('加载日志失败，请稍后重试');
     } finally {
       setLoading(false);
     }
@@ -256,11 +282,10 @@ function ApiLogsList() {
 
   useEffect(() => {
     loadLogs();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, methodFilter, statusFilter, debouncedPath]);
 
-  if (loading && logs.length === 0) {
-    return <div className="text-center py-8 text-gray-600 dark:text-gray-400">加载中...</div>;
-  }
+  const totalPages = Math.ceil(total / pageSize);
 
   const getStatusColor = (status: number) => {
     if (status < 300) return 'text-green-600 dark:text-green-400';
@@ -280,65 +305,289 @@ function ApiLogsList() {
     return colors[method] || colors.GET;
   };
 
+  // 判断是否是慢查询（超过 3 秒）
+  const isSlowQuery = (duration: number) => duration >= 3000;
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                方法
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                路径
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                状态
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                耗时
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                用户
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                时间
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-            {logs.map((log) => (
-              <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                <td className="px-6 py-4">
-                  <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getMethodColor(
-                      log.method
-                    )}`}
+    <div className="space-y-4">
+      {/* 筛选器 */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <button
+          onClick={() => setIsFilterExpanded(!isFilterExpanded)}
+          className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">筛选条件</span>
+            {(methodFilter !== 'all' || statusFilter !== 'all' || pathFilter) && (
+              <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">
+                {[
+                  methodFilter !== 'all' && methodFilter,
+                  statusFilter !== 'all' && `状态 ${statusFilter}xx`,
+                  pathFilter && `路径: ${pathFilter}`,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {(methodFilter !== 'all' || statusFilter !== 'all' || pathFilter) && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMethodFilter('all');
+                  setStatusFilter('all');
+                  setPathFilter('');
+                  setPage(1);
+                }}
+                className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium flex items-center gap-1 px-2 py-1 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+              >
+                <X className="w-3 h-3" />
+                清空
+              </button>
+            )}
+            {isFilterExpanded ? (
+              <ChevronUp className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+            )}
+          </div>
+        </button>
+
+        {isFilterExpanded && (
+          <div className="px-4 pb-4 pt-2 border-t border-gray-200 dark:border-gray-700">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  HTTP 方法
+                </label>
+                <select
+                  value={methodFilter}
+                  onChange={(e) => {
+                    setMethodFilter(e.target.value as MethodFilter);
+                    setPage(1);
+                  }}
+                  className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="all">全部方法</option>
+                  <option value="GET">GET</option>
+                  <option value="POST">POST</option>
+                  <option value="PUT">PUT</option>
+                  <option value="PATCH">PATCH</option>
+                  <option value="DELETE">DELETE</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  状态码范围
+                </label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => {
+                    setStatusFilter(e.target.value as StatusFilter);
+                    setPage(1);
+                  }}
+                  className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="all">全部状态</option>
+                  <option value="2">2xx 成功</option>
+                  <option value="3">3xx 重定向</option>
+                  <option value="4">4xx 客户端错误</option>
+                  <option value="5">5xx 服务器错误</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  路径搜索
+                </label>
+                <input
+                  type="text"
+                  value={pathFilter}
+                  onChange={(e) => {
+                    setPathFilter(e.target.value);
+                    setPage(1);
+                  }}
+                  placeholder="搜索路径..."
+                  className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 错误提示 */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex-shrink-0">
+              <svg
+                className="w-5 h-5 text-red-600 dark:text-red-400"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-800 dark:text-red-200">{error}</p>
+            </div>
+            <button
+              onClick={() => setError(null)}
+              className="flex-shrink-0 text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  fillRule="evenodd"
+                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 日志表格 */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+        {loading && logs.length === 0 ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="flex flex-col items-center gap-3">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">加载中...</p>
+            </div>
+          </div>
+        ) : logs.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="text-gray-400 dark:text-gray-500 mb-3">
+              <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+            </div>
+            <p className="text-gray-600 dark:text-gray-400 font-medium">暂无 API 日志记录</p>
+            <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
+              API 请求将被自动记录到此处
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 border-b-2 border-gray-200 dark:border-gray-700">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    时间
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    方法
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    路径
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    状态码
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    耗时
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    用户
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    IP 地址
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
+                {logs.map((log) => (
+                  <tr
+                    key={log.id}
+                    className={`hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors ${
+                      isSlowQuery(log.duration)
+                        ? 'bg-yellow-50/50 dark:bg-yellow-900/10 border-l-4 border-l-yellow-500'
+                        : ''
+                    }`}
                   >
-                    {log.method}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-900 dark:text-white font-mono">
-                  {log.path}
-                </td>
-                <td className="px-6 py-4">
-                  <span className={`text-sm font-semibold ${getStatusColor(log.statusCode)}`}>
-                    {log.statusCode}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
-                  {log.duration}ms
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
-                  {log.user?.email || '-'}
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
-                  {new Date(log.createdAt).toLocaleString('zh-CN')}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                      {new Date(log.createdAt).toLocaleString('zh-CN')}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getMethodColor(
+                          log.method
+                        )}`}
+                      >
+                        {log.method}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-white font-mono">
+                      <span className="truncate block max-w-xs" title={log.path}>
+                        {log.path}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`text-sm font-semibold ${getStatusColor(log.statusCode)} ${
+                          log.errorMessage
+                            ? 'cursor-help border-b-2 border-dotted border-current'
+                            : ''
+                        }`}
+                        title={log.errorMessage || undefined}
+                      >
+                        {log.statusCode}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <span
+                        className={`font-medium ${
+                          isSlowQuery(log.duration)
+                            ? 'text-yellow-700 dark:text-yellow-400 font-bold'
+                            : 'text-gray-500 dark:text-gray-400'
+                        }`}
+                      >
+                        {log.duration >= 1000
+                          ? `${(log.duration / 1000).toFixed(2)}s`
+                          : `${log.duration}ms`}
+                        {isSlowQuery(log.duration) && ' ⚠️'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                      {log.user ? (
+                        <span>{log.user.displayName || log.user.username}</span>
+                      ) : (
+                        <span className="text-gray-400">匿名</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-white font-mono text-xs">
+                      {log.ipAddress || '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* 分页 */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              total={total}
+              pageSize={pageSize}
+              onPageChange={setPage}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

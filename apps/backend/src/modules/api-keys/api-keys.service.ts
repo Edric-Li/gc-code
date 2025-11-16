@@ -1475,9 +1475,7 @@ export class ApiKeysService {
               },
             });
             if (!channel) {
-              throw new BadRequestException(
-                `渠道 ${dto.channelId} 不属于供货商 ${dto.providerId}`
-              );
+              throw new BadRequestException(`渠道 ${dto.channelId} 不属于供货商 ${dto.providerId}`);
             }
             updateData.channel = { connect: { id: dto.channelId } };
           } else {
@@ -1564,9 +1562,7 @@ export class ApiKeysService {
             },
           });
           if (!channel) {
-            throw new BadRequestException(
-              `渠道 ${dto.channelId} 不属于供货商 ${dto.providerId}`
-            );
+            throw new BadRequestException(`渠道 ${dto.channelId} 不属于供货商 ${dto.providerId}`);
           }
           updateData.channel = { connect: { id: dto.channelId } };
         }

@@ -26,7 +26,7 @@ export class ChannelAutoRecoveryService {
     private prisma: PrismaService,
     private channelPoolCache: ChannelPoolCacheService,
     private errorTracker: ChannelErrorTrackerService,
-    private alertService: ChannelAlertService,
+    private alertService: ChannelAlertService
   ) {}
 
   /**
@@ -56,9 +56,7 @@ export class ChannelAutoRecoveryService {
         return;
       }
 
-      this.logger.log(
-        `Found ${channelsToRecover.length} channels to recover from TEMP_ERROR`
-      );
+      this.logger.log(`Found ${channelsToRecover.length} channels to recover from TEMP_ERROR`);
 
       // 批量恢复渠道
       for (const channel of channelsToRecover) {

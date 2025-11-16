@@ -94,7 +94,7 @@ export default function ManageChannelsDialog({
 
   // 过滤掉已在分组中的渠道
   const channelsNotInGroup = availableChannels.filter(
-    (channel) => !groupChannels.some((gc) => gc.id === channel.id)
+    (channel) => !groupChannels.some((gc: { id: string }) => gc.id === channel.id)
   );
 
   return (
@@ -171,12 +171,15 @@ export default function ManageChannelsDialog({
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {groupChannels.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                      <td
+                        colSpan={6}
+                        className="px-6 py-4 text-center text-gray-500 dark:text-gray-400"
+                      >
                         暂无渠道，点击上方按钮添加
                       </td>
                     </tr>
                   ) : (
-                    groupChannels.map((channel) => (
+                    groupChannels.map((channel: ChannelGroupChannelsResponse['channels'][0]) => (
                       <tr key={channel.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900 dark:text-white">
@@ -244,7 +247,9 @@ export default function ManageChannelsDialog({
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">选择要添加的渠道</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                选择要添加的渠道
+              </h3>
               <button
                 onClick={() => {
                   setShowAddDialog(false);
@@ -275,7 +280,9 @@ export default function ManageChannelsDialog({
                         className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
                       />
                       <div className="flex-1">
-                        <div className="font-medium text-gray-900 dark:text-white">{channel.name}</div>
+                        <div className="font-medium text-gray-900 dark:text-white">
+                          {channel.name}
+                        </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
                           供货商：{channel.provider?.name || '未知'}
                         </div>

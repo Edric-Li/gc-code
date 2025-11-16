@@ -126,9 +126,7 @@ export class ClaudeChannelSelectorService {
       }
 
       // 检查粘性会话的渠道是否在候选列表中
-      const stickyChannel = candidateChannels.find(
-        (ch) => ch.id === mapping.channelId
-      );
+      const stickyChannel = candidateChannels.find((ch) => ch.id === mapping.channelId);
 
       if (!stickyChannel) {
         // 渠道不在候选列表中（可能被移出分组）
@@ -162,7 +160,6 @@ export class ClaudeChannelSelectorService {
       return null;
     }
   }
-
 
   /**
    * 根据 API Key 的 targetType 获取候选渠道列表
@@ -224,8 +221,8 @@ export class ClaudeChannelSelectorService {
           status: ChannelStatus.ACTIVE,
         },
         orderBy: [
-          { lastUsedAt: { sort: 'asc', nulls: 'first' } },  // null 值（从未使用）优先，然后是最久未使用
-          { priority: 'asc' },    // 次按优先级
+          { lastUsedAt: { sort: 'asc', nulls: 'first' } }, // null 值（从未使用）优先，然后是最久未使用
+          { priority: 'asc' }, // 次按优先级
         ],
       });
 
@@ -252,9 +249,7 @@ export class ClaudeChannelSelectorService {
     }
 
     // 如果所有候选渠道都不可用
-    throw new BadRequestException(
-      `All ${candidates.length} candidate channels are unavailable`
-    );
+    throw new BadRequestException(`All ${candidates.length} candidate channels are unavailable`);
   }
 
   /**
@@ -273,7 +268,7 @@ export class ClaudeChannelSelectorService {
         channel.rateLimitEndAt &&
         new Date() > channel.rateLimitEndAt
       ) {
-        return true;  // 限流已过期，可以尝试使用
+        return true; // 限流已过期，可以尝试使用
       }
       return false;
     }

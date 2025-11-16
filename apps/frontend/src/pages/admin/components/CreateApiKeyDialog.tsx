@@ -119,7 +119,10 @@ export default function CreateApiKeyDialog({ onClose, onCreate }: CreateApiKeyDi
 
         if (formData.channelTargetType === ChannelTargetType.CHANNEL && formData.channelId) {
           cleanData.channelId = formData.channelId;
-        } else if (formData.channelTargetType === ChannelTargetType.PROVIDER && formData.providerId) {
+        } else if (
+          formData.channelTargetType === ChannelTargetType.PROVIDER &&
+          formData.providerId
+        ) {
           cleanData.providerId = formData.providerId;
         }
       }
@@ -253,7 +256,9 @@ export default function CreateApiKeyDialog({ onClose, onCreate }: CreateApiKeyDi
             </label>
             <select
               value={formData.channelTargetType}
-              onChange={(e) => handleChange('channelTargetType', e.target.value as ChannelTargetType)}
+              onChange={(e) =>
+                handleChange('channelTargetType', e.target.value as ChannelTargetType)
+              }
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value={ChannelTargetType.CHANNEL}>具体渠道</option>

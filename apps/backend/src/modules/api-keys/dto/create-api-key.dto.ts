@@ -94,7 +94,8 @@ export class CreateApiKeyDto {
   providerId?: string;
 
   @ApiPropertyOptional({
-    description: '自定义 API Key 值（仅管理员可用），如果不指定则自动生成。必须以 sk- 或 cr_ 开头，长度10-255字符',
+    description:
+      '自定义 API Key 值（仅管理员可用），如果不指定则自动生成。必须以 sk- 或 cr_ 开头，长度10-255字符',
     example: 'sk-1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
   })
   @IsString()

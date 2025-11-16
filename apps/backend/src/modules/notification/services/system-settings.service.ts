@@ -85,10 +85,7 @@ export class SystemSettingsService {
 
       // 运行时类型验证
       if (!this.isValidEmailConfig(setting.value)) {
-        this.logger.error(
-          '邮件配置格式无效，请检查数据库中的配置是否被篡改',
-          setting.value,
-        );
+        this.logger.error('邮件配置格式无效，请检查数据库中的配置是否被篡改', setting.value);
         return null;
       }
 
@@ -146,7 +143,7 @@ export class SystemSettingsService {
         if (!this.isValidAlertConfig(setting.value)) {
           this.logger.error(
             '告警配置格式无效，请检查数据库中的配置是否被篡改，将使用默认配置',
-            setting.value,
+            setting.value
           );
           // 继续执行以返回默认配置
         } else {

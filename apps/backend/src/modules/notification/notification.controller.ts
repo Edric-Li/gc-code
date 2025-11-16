@@ -31,7 +31,7 @@ export class NotificationController {
   constructor(
     private readonly emailService: EmailNotificationService,
     private readonly settingsService: SystemSettingsService,
-    private readonly alertService: ChannelAlertService,
+    private readonly alertService: ChannelAlertService
   ) {}
 
   // ==================== 邮件配置管理 ====================
@@ -151,7 +151,7 @@ export class NotificationController {
     @Query('alertType') alertType?: AlertType,
     @Query('status') status?: NotificationStatus,
     @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
+    @Query('offset') offset?: string
   ) {
     const result = await this.alertService.getAlertHistory({
       channelId,
@@ -175,9 +175,7 @@ export class NotificationController {
    */
   @Get('alerts/stats')
   async getAlertStats(@Query('days') days?: string) {
-    const stats = await this.alertService.getAlertStats(
-      days ? parseInt(days, 10) : undefined,
-    );
+    const stats = await this.alertService.getAlertStats(days ? parseInt(days, 10) : undefined);
 
     return {
       success: true,

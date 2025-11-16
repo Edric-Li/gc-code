@@ -92,7 +92,7 @@ export const notificationApi = {
   testEmailConnection: (config?: EmailConfig) =>
     api.post<ApiResponse<{ success: boolean; message: string }>>(
       '/notifications/email/test-connection',
-      config || {},
+      config || {}
     ),
 
   /**
@@ -147,7 +147,7 @@ export const notificationApi = {
     }
     const queryString = queryParams.toString();
     return api.get<ApiResponse<AlertLog[]>>(
-      `/notifications/alerts/history${queryString ? `?${queryString}` : ''}`,
+      `/notifications/alerts/history${queryString ? `?${queryString}` : ''}`
     );
   },
 

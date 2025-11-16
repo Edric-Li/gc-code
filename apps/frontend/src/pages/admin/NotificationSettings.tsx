@@ -357,7 +357,12 @@ function AlertConfigSection() {
     cooldownMinutes: 30,
     batchEnabled: false,
     batchIntervalMinutes: 5,
-    enabledTypes: [AlertType.ERROR, AlertType.TEMP_ERROR, AlertType.RATE_LIMITED, AlertType.RECOVERED],
+    enabledTypes: [
+      AlertType.ERROR,
+      AlertType.TEMP_ERROR,
+      AlertType.RATE_LIMITED,
+      AlertType.RECOVERED,
+    ],
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -439,29 +444,28 @@ function AlertConfigSection() {
     }
   };
 
-  const alertTypeLabels: Record<AlertType, { label: string; description: string; icon: string }> =
-    {
-      [AlertType.ERROR]: {
-        label: '认证失败告警',
-        description: '渠道 API Key 认证失败 (401/403)',
-        icon: '🚨',
-      },
-      [AlertType.TEMP_ERROR]: {
-        label: '临时错误告警',
-        description: '5分钟内连续3次服务器错误 (5xx)',
-        icon: '⚠️',
-      },
-      [AlertType.RATE_LIMITED]: {
-        label: '限流告警',
-        description: '渠道被限流 (429 Too Many Requests)',
-        icon: '⏱️',
-      },
-      [AlertType.RECOVERED]: {
-        label: '恢复通知',
-        description: '渠道从错误状态自动恢复',
-        icon: '✅',
-      },
-    };
+  const alertTypeLabels: Record<AlertType, { label: string; description: string; icon: string }> = {
+    [AlertType.ERROR]: {
+      label: '认证失败告警',
+      description: '渠道 API Key 认证失败 (401/403)',
+      icon: '🚨',
+    },
+    [AlertType.TEMP_ERROR]: {
+      label: '临时错误告警',
+      description: '5分钟内连续3次服务器错误 (5xx)',
+      icon: '⚠️',
+    },
+    [AlertType.RATE_LIMITED]: {
+      label: '限流告警',
+      description: '渠道被限流 (429 Too Many Requests)',
+      icon: '⏱️',
+    },
+    [AlertType.RECOVERED]: {
+      label: '恢复通知',
+      description: '渠道从错误状态自动恢复',
+      icon: '✅',
+    },
+  };
 
   if (loading) {
     return (

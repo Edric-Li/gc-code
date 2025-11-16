@@ -1,5 +1,6 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { LogService } from './log.service';
+import { LogCleanupService } from './log-cleanup.service';
 import {
   QueryLoginLogsDto,
   QueryAuditLogsDto,
@@ -15,7 +16,10 @@ import { Role } from '@prisma/client';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN) // 只有管理员可以查看日志
 export class LogController {
-  constructor(private readonly logService: LogService) {}
+  constructor(
+    private readonly logService: LogService,
+    private readonly logCleanupService: LogCleanupService
+  ) {}
 
   @Get('login')
   async getLoginLogs(@Query() query: QueryLoginLogsDto) {
@@ -72,5 +76,15 @@ export class LogController {
     const endDate = query.endDate ? new Date(query.endDate) : undefined;
 
     return this.logService.getLogStatistics(startDate, endDate);
+  }
+
+  @Get('cleanup/stats')
+  async getCleanupStats() {
+    return this.logCleanupService.getLogStats();
+  }
+
+  @Post('cleanup/manual')
+  async manualCleanup() {
+    return this.logCleanupService.manualCleanup();
   }
 }

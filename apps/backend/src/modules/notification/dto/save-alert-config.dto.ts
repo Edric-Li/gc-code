@@ -1,4 +1,13 @@
-import { IsArray, IsNumber, IsBoolean, IsEmail, IsEnum, Min, Max, ArrayMinSize } from 'class-validator';
+import {
+  IsArray,
+  IsNumber,
+  IsBoolean,
+  IsEmail,
+  IsEnum,
+  Min,
+  Max,
+  ArrayMinSize,
+} from 'class-validator';
 import { AlertType } from '@prisma/client';
 
 export class SaveAlertConfigDto {

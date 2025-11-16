@@ -8,15 +8,7 @@ import { NotificationController } from './notification.controller';
 @Module({
   imports: [PrismaModule],
   controllers: [NotificationController],
-  providers: [
-    SystemSettingsService,
-    EmailNotificationService,
-    ChannelAlertService,
-  ],
-  exports: [
-    SystemSettingsService,
-    EmailNotificationService,
-    ChannelAlertService,
-  ],
+  providers: [SystemSettingsService, EmailNotificationService, ChannelAlertService],
+  exports: [SystemSettingsService, EmailNotificationService, ChannelAlertService],
 })
 export class NotificationModule {}

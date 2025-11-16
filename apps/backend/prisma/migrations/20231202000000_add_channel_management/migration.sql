@@ -139,4 +139,3 @@ ALTER TABLE "channel_usage" ADD CONSTRAINT "channel_usage_channel_id_fkey" FOREI
 
 -- RenameIndex
 ALTER INDEX "api_tokens_token_key" RENAME TO "api_keys_key_key";
-

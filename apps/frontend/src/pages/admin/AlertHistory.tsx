@@ -5,7 +5,6 @@ import {
   XCircle,
   Clock,
   Filter,
-  Download,
   RefreshCw,
   ChevronLeft,
   ChevronRight,
@@ -85,9 +84,7 @@ export default function AlertHistory() {
       {/* 标题 */}
       <div>
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">告警历史</h2>
-        <p className="text-gray-600 dark:text-gray-400 mt-1">
-          查看渠道告警通知的发送记录和状态
-        </p>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">查看渠道告警通知的发送记录和状态</p>
       </div>
 
       {/* 筛选和操作栏 */}
@@ -142,12 +139,7 @@ export default function AlertHistory() {
 
       {/* 统计卡片 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard
-          title="总告警数"
-          value={total}
-          icon={Bell}
-          color="blue"
-        />
+        <StatCard title="总告警数" value={total} icon={Bell} color="blue" />
         <StatCard
           title="成功发送"
           value={alerts.filter((a) => a.status === NotificationStatus.SENT).length}

@@ -18,7 +18,7 @@ export class ChannelAlertService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailService: EmailNotificationService,
-    private readonly settingsService: SystemSettingsService,
+    private readonly settingsService: SystemSettingsService
   ) {}
 
   /**
@@ -27,15 +27,13 @@ export class ChannelAlertService {
   async sendAlert(
     channel: Channel,
     alertType: AlertType,
-    details?: AlertDetails,
+    details?: AlertDetails
   ): Promise<boolean> {
     try {
       // 1. 检查是否启用该类型的告警
       const alertConfig = await this.settingsService.getAlertConfig();
       if (!alertConfig.enabledTypes.includes(alertType)) {
-        this.logger.debug(
-          `告警类型 ${alertType} 未启用，跳过发送 (渠道: ${channel.name})`,
-        );
+        this.logger.debug(`告警类型 ${alertType} 未启用，跳过发送 (渠道: ${channel.name})`);
         return false;
       }
 
@@ -50,22 +48,16 @@ export class ChannelAlertService {
         const shouldSend = await this.shouldSendAlert(
           channel.id,
           alertType,
-          alertConfig.cooldownMinutes,
+          alertConfig.cooldownMinutes
         );
         if (!shouldSend) {
-          this.logger.debug(
-            `渠道 ${channel.name} 的 ${alertType} 告警在冷却期内，跳过发送`,
-          );
+          this.logger.debug(`渠道 ${channel.name} 的 ${alertType} 告警在冷却期内，跳过发送`);
           return false;
         }
       }
 
       // 4. 生成邮件内容
-      const { subject, html, text } = this.generateEmailContent(
-        channel,
-        alertType,
-        details,
-      );
+      const { subject, html, text } = this.generateEmailContent(channel, alertType, details);
 
       // 5. 记录告警日志（状态为 PENDING）
       const log = await this.prisma.alertNotificationLog.create({
@@ -98,12 +90,10 @@ export class ChannelAlertService {
 
       if (success) {
         this.logger.log(
-          `告警邮件已发送: ${channel.name} - ${alertType} (收件人: ${alertConfig.recipients.length}人)`,
+          `告警邮件已发送: ${channel.name} - ${alertType} (收件人: ${alertConfig.recipients.length}人)`
         );
       } else {
-        this.logger.error(
-          `告警邮件发送失败: ${channel.name} - ${alertType}`,
-        );
+        this.logger.error(`告警邮件发送失败: ${channel.name} - ${alertType}`);
       }
 
       return success;
@@ -119,7 +109,7 @@ export class ChannelAlertService {
   private async shouldSendAlert(
     channelId: string,
     alertType: AlertType,
-    cooldownMinutes: number,
+    cooldownMinutes: number
   ): Promise<boolean> {
     const cutoffTime = new Date(Date.now() - cooldownMinutes * 60 * 1000);
 
@@ -142,7 +132,7 @@ export class ChannelAlertService {
   private generateEmailContent(
     channel: Channel,
     alertType: AlertType,
-    details?: AlertDetails,
+    details?: AlertDetails
   ): { subject: string; html: string; text: string } {
     const timestamp = new Date().toLocaleString('zh-CN', {
       timeZone: 'Asia/Shanghai',
@@ -207,10 +197,7 @@ export class ChannelAlertService {
         severityColor = '#28a745';
         title = '渠道已恢复';
         subject = `【恢复】渠道 ${channel.name} 已恢复正常`;
-        recommendation = [
-          '渠道已重新加入可用池',
-          '系统将继续监控该渠道状态',
-        ];
+        recommendation = ['渠道已重新加入可用池', '系统将继续监控该渠道状态'];
         break;
     }
 
