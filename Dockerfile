@@ -12,8 +12,8 @@ RUN npm install -g pnpm
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/frontend/package.json ./apps/frontend/
 
-# 安装前端依赖
-RUN pnpm install --frozen-lockfile --filter @gc-code/frontend
+# 安装前端依赖（跳过 postinstall 脚本，因为后端目录不存在）
+RUN pnpm install --frozen-lockfile --filter @gc-code/frontend --ignore-scripts
 
 # 复制前端源代码
 COPY apps/frontend/ ./apps/frontend/
@@ -39,8 +39,8 @@ WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/backend/package.json ./apps/backend/
 
-# 安装后端依赖（包括 devDependencies 用于构建）
-RUN pnpm install --frozen-lockfile --filter @gc-code/backend
+# 安装后端依赖（包括 devDependencies 用于构建，跳过 postinstall）
+RUN pnpm install --frozen-lockfile --filter @gc-code/backend --ignore-scripts
 
 # 复制后端源代码和 Prisma schema
 COPY apps/backend/ ./apps/backend/
