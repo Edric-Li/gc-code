@@ -94,7 +94,7 @@ export default function ManageChannelsDialog({
 
   // 过滤掉已在分组中的渠道
   const channelsNotInGroup = availableChannels.filter(
-    (channel) => !groupChannels.some((gc) => gc.id === channel.id)
+    (channel) => !groupChannels.some((gc: { id: string }) => gc.id === channel.id)
   );
 
   return (
@@ -179,7 +179,7 @@ export default function ManageChannelsDialog({
                       </td>
                     </tr>
                   ) : (
-                    groupChannels.map((channel) => (
+                    groupChannels.map((channel: ChannelGroupChannelsResponse['channels'][0]) => (
                       <tr key={channel.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900 dark:text-white">
