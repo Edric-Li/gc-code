@@ -78,6 +78,28 @@ enum ChannelStatus {
   RATE_LIMITED // 限流中
 }
 
+enum SettingCategory {
+  EMAIL // 邮件配置
+  SMS // 短信配置（预留）
+  WEBHOOK // Webhook配置（预留）
+  ALERT // 告警规则配置
+  SYSTEM // 系统参数
+  FEATURE // 功能开关
+}
+
+enum AlertType {
+  TEMP_ERROR // 临时错误（5分钟内3次5xx）
+  ERROR // 永久性错误（401/403）
+  RATE_LIMITED // 被限流（429）
+  RECOVERED // 渠道已恢复
+}
+
+enum NotificationStatus {
+  PENDING // 待发送
+  SENT // 已发送
+  FAILED // 发送失败
+}
+
 enum ProviderType {
   OPENAI
   ANTHROPIC
@@ -410,11 +432,12 @@ model Channel {
   metadata  Json? // 扩展配置（自定义请求头、代理设置、重试策略等）
 
   // 关联关系
-  provider     AiProvider         @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  provider     AiProvider            @relation(fields: [providerId], references: [id], onDelete: Cascade)
   models       ChannelModel[]
   apiKeys      ApiKey[] // 使用该渠道的 API Keys
   usageRecords ChannelUsage[]
   requestLogs  ApiKeyRequestLog[]
+  alertLogs    AlertNotificationLog[] // 告警日志
 
   @@index([providerId], name: "idx_channels_provider_id")
   @@index([status], name: "idx_channels_status")
@@ -532,4 +555,42 @@ model ApiKeyRequestLog {
   @@index([createdAt], name: "idx_request_log_created_at")
   @@index([requestId], name: "idx_request_log_request_id")
   @@map("api_key_request_logs")
+}
+
+// 系统配置表（通用）
+model SystemSettings {
+  id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  category    SettingCategory // 配置分类
+  key         String          @db.VarChar(100) // 配置键（如 smtp.primary）
+  value       Json // 配置值（JSON格式）
+  encrypted   Boolean         @default(false) // 是否加密存储
+  enabled     Boolean         @default(true) // 是否启用
+  description String?         @db.Text // 描述
+  metadata    Json? // 元数据（如配置的schema、UI渲染信息等）
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamp(3)
+  updatedAt   DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
+
+  @@unique([category, key])
+  @@index([category, enabled])
+  @@map("system_settings")
+}
+
+// 告警通知日志
+model AlertNotificationLog {
+  id           String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  channelId    String             @map("channel_id") @db.Uuid
+  alertType    AlertType // TEMP_ERROR, ERROR, RATE_LIMITED, RECOVERED
+  recipients   String[] // 收件人列表
+  subject      String              @db.VarChar(500)
+  content      String              @db.Text
+  sentAt       DateTime            @default(now()) @map("sent_at") @db.Timestamp(3)
+  status       NotificationStatus  @default(PENDING)
+  errorMessage String?             @map("error_message") @db.Text
+  retryCount   Int                 @default(0) @map("retry_count")
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@index([channelId, alertType, sentAt])
+  @@index([status, sentAt])
+  @@map("alert_notification_logs")
 }

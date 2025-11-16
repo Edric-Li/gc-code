@@ -1,12 +1,13 @@
 import { Injectable, Logger, HttpException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import { Channel } from '@prisma/client';
+import { Channel, AlertType } from '@prisma/client';
 import { ClaudeChannelSelectorService } from './claude-channel-selector.service';
 import { firstValueFrom } from 'rxjs';
 import { AxiosResponse } from 'axios';
 import { ApiKeyInfo, ClaudeMessagesRequest } from '../interfaces/claude-api.interface';
 import { ProxyResponse, StreamProxyResponse } from '../interfaces/proxy.interface';
 import { decryptApiKey } from '../../../common/crypto.util';
+import { ChannelAlertService } from '../../notification/services/channel-alert.service';
 
 /**
  * Claude API 请求代理服务
@@ -18,7 +19,8 @@ export class ClaudeProxyService {
 
   constructor(
     private httpService: HttpService,
-    private channelSelector: ClaudeChannelSelectorService
+    private channelSelector: ClaudeChannelSelectorService,
+    private alertService: ChannelAlertService,
   ) {}
 
   /**
@@ -197,6 +199,7 @@ export class ClaudeProxyService {
         status?: number;
         headers?: Record<string, string>;
       };
+      message?: string;
     };
     const status = axiosError.response?.status;
 
@@ -210,11 +213,23 @@ export class ClaudeProxyService {
       this.logger.warn(
         `Channel ${channel.name} rate limited, reset at: ${resetTimestamp ? new Date(resetTimestamp * 1000) : 'unknown'}`
       );
+
+      // 发送限流告警
+      await this.alertService.sendAlert(channel, AlertType.RATE_LIMITED, {
+        statusCode: status,
+        resetTimestamp: resetTimestamp ? new Date(resetTimestamp * 1000) : undefined,
+      });
     }
     // 401, 403: 认证失败（永久性错误）
     else if (status === 401 || status === 403) {
       await this.channelSelector.markChannelError(channel.id);
       this.logger.error(`Channel ${channel.name} authentication failed (${status}) - marked as ERROR`);
+
+      // 发送认证失败告警
+      await this.alertService.sendAlert(channel, AlertType.ERROR, {
+        statusCode: status,
+        errorMessage: axiosError.message || '认证失败',
+      });
     }
     // 500+: 服务器错误（临时错误，追踪错误次数）
     else if (status >= 500) {
@@ -223,6 +238,13 @@ export class ClaudeProxyService {
         this.logger.error(
           `Channel ${channel.name} exceeded server error threshold - marked as TEMP_ERROR (auto-recover in 5 min)`
         );
+
+        // 发送临时错误告警（超过阈值）
+        await this.alertService.sendAlert(channel, AlertType.TEMP_ERROR, {
+          statusCode: status,
+          errorMessage: axiosError.message || '服务器错误',
+          errorCount: 3, // 错误阈值
+        });
       } else {
         this.logger.warn(`Channel ${channel.name} server error (${status}) - error recorded`);
       }
