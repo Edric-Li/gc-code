@@ -72,10 +72,11 @@ export class ApiKeysController {
       action: AuditAction.CREATE,
       resource: 'ApiKey',
       resourceId: result.id,
-      description: `创建 API Key: ${result.name}`,
+      description: `创建 API Key: ${result.name}${createApiKeyDto.customKey ? ' (使用自定义 key)' : ''}`,
       changes: {
         name: result.name,
         targetUserId: createApiKeyDto.userId,
+        customKey: createApiKeyDto.customKey ? true : false,
       },
       ipAddress: expressReq.ip || expressReq.socket.remoteAddress,
       userAgent: expressReq.headers['user-agent'],

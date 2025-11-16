@@ -283,8 +283,15 @@ export class AuthService {
         });
 
         if (existingUser) {
-          console.log('Existing user found, creating OAuth link...');
-          // 如果用户存在，创建 OAuth 关联
+          console.log('Existing user found (pre-created user), creating OAuth link and updating user info...');
+
+          // 检查预创建用户是否已被禁用
+          if (!existingUser.isActive) {
+            console.log('User account is deactivated');
+            throw new UnauthorizedException('This account has been deactivated. Please contact administrator.');
+          }
+
+          // 如果用户存在（预创建的用户），创建 OAuth 关联
           oauthAccount = await this.prisma.oAuthAccount.create({
             data: {
               provider: 'AZURE_AD',
@@ -299,7 +306,35 @@ export class AuthService {
               user: true,
             },
           });
-          user = existingUser;
+
+          // 更新用户信息（完善预创建用户的信息）
+          const updateData: {
+            lastLoginAt: Date;
+            displayName?: string;
+            avatarUrl?: string;
+          } = {
+            lastLoginAt: new Date(),
+          };
+
+          // 如果预创建的用户没有 displayName，使用 OAuth 提供的 displayName
+          if (!existingUser.displayName && azureUser.displayName) {
+            updateData.displayName = azureUser.displayName;
+          }
+
+          // 如果预创建的用户没有头像，使用 OAuth 提供的头像
+          if (!existingUser.avatarUrl && azureUser.photoDataUrl) {
+            updateData.avatarUrl = azureUser.photoDataUrl;
+          }
+
+          user = await this.prisma.user.update({
+            where: { id: existingUser.id },
+            data: updateData,
+          });
+
+          console.log('Pre-created user info updated:', {
+            displayNameUpdated: !!updateData.displayName,
+            avatarUrlUpdated: !!updateData.avatarUrl,
+          });
         } else {
           // 创建新用户和 OAuth 关联
           const username = (azureUser.mail || azureUser.userPrincipalName).split('@')[0];
