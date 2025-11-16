@@ -541,229 +541,64 @@ export class ApiKeysService {
     userId: string,
     updateApiKeyDto: UpdateApiKeyDto
   ): Promise<ApiKeyResponseEntity> {
-    // 检查 API Key 是否存在且属于该用户
-    const existingApiKey = await this.prisma.apiKey.findFirst({
-      where: { id, userId },
-    });
+    // 使用事务确保验证和更新的原子性
+    const updatedApiKey = await this.prisma.$transaction(async (tx) => {
+      // 检查 API Key 是否存在且属于该用户（使用事务）
+      const existingApiKey = await tx.apiKey.findFirst({
+        where: { id, userId },
+      });
 
-    if (!existingApiKey) {
-      throw new NotFoundException('API Key not found');
-    }
-
-    // 更新数据
-    const updateData: Prisma.ApiKeyUpdateInput = {};
-
-    if (updateApiKeyDto.name !== undefined) {
-      updateData.name = updateApiKeyDto.name;
-    }
-    if (updateApiKeyDto.description !== undefined) {
-      updateData.description = updateApiKeyDto.description;
-    }
-    if (updateApiKeyDto.expiresAt !== undefined) {
-      updateData.expiresAt = new Date(updateApiKeyDto.expiresAt);
-    }
-    if (updateApiKeyDto.dailyCostLimit !== undefined) {
-      updateData.dailyCostLimit = new Prisma.Decimal(updateApiKeyDto.dailyCostLimit);
-    }
-
-    // 处理渠道目标类型更新
-    if (updateApiKeyDto.channelTargetType !== undefined) {
-      updateData.channelTargetType = updateApiKeyDto.channelTargetType;
-
-      // 根据新的 targetType 验证和更新关联
-      if (updateApiKeyDto.channelTargetType === ChannelTargetType.CHANNEL) {
-        if (updateApiKeyDto.channelId !== undefined) {
-          if (updateApiKeyDto.channelId) {
-            const channel = await this.prisma.channel.findFirst({
-              where: {
-                id: updateApiKeyDto.channelId,
-                deletedAt: null,
-              },
-            });
-
-            if (!channel) {
-              throw new NotFoundException(`Channel with ID ${updateApiKeyDto.channelId} not found`);
-            }
-            updateData.channel = { connect: { id: updateApiKeyDto.channelId } };
-          } else {
-            updateData.channel = { disconnect: true };
-          }
-        }
-        // 清除其他类型的关联
-        updateData.provider = { disconnect: true };
-      } else if (updateApiKeyDto.channelTargetType === ChannelTargetType.PROVIDER) {
-        if (updateApiKeyDto.providerId !== undefined) {
-          if (updateApiKeyDto.providerId) {
-            const provider = await this.prisma.aiProvider.findFirst({
-              where: {
-                id: updateApiKeyDto.providerId,
-              },
-            });
-
-            if (!provider) {
-              throw new NotFoundException(`AI Provider with ID ${updateApiKeyDto.providerId} not found`);
-            }
-            updateData.provider = { connect: { id: updateApiKeyDto.providerId } };
-
-            // 如果同时指定了专属渠道，验证该渠道是否属于该供货商
-            if (updateApiKeyDto.channelId !== undefined) {
-              if (updateApiKeyDto.channelId) {
-                const channel = await this.prisma.channel.findFirst({
-                  where: {
-                    id: updateApiKeyDto.channelId,
-                    providerId: updateApiKeyDto.providerId,
-                    deletedAt: null,
-                  },
-                });
-
-                if (!channel) {
-                  throw new BadRequestException(
-                    `Channel with ID ${updateApiKeyDto.channelId} does not belong to provider ${updateApiKeyDto.providerId} or does not exist`
-                  );
-                }
-                updateData.channel = { connect: { id: updateApiKeyDto.channelId } };
-              } else {
-                updateData.channel = { disconnect: true };
-              }
-            }
-          } else {
-            updateData.provider = { disconnect: true };
-            // 如果清除供货商，也清除专属渠道
-            updateData.channel = { disconnect: true };
-          }
-        } else if (updateApiKeyDto.channelId !== undefined) {
-          // 只更新专属渠道（保持供货商不变）
-          // 需要验证渠道属于当前的供货商
-          const currentProviderId = existingApiKey.providerId;
-          if (!currentProviderId) {
-            throw new BadRequestException('Cannot set channel without a provider');
-          }
-
-          if (updateApiKeyDto.channelId) {
-            const channel = await this.prisma.channel.findFirst({
-              where: {
-                id: updateApiKeyDto.channelId,
-                providerId: currentProviderId,
-                deletedAt: null,
-              },
-            });
-
-            if (!channel) {
-              throw new BadRequestException(
-                `Channel with ID ${updateApiKeyDto.channelId} does not belong to provider ${currentProviderId} or does not exist`
-              );
-            }
-            updateData.channel = { connect: { id: updateApiKeyDto.channelId } };
-          } else {
-            updateData.channel = { disconnect: true };
-          }
-        }
+      if (!existingApiKey) {
+        throw new NotFoundException('API Key not found');
       }
-    } else {
-      // 如果只更新关联ID（不更新targetType）
-      // 需要根据当前的 targetType 来验证
-      const currentTargetType = existingApiKey.channelTargetType;
 
-      if (updateApiKeyDto.providerId !== undefined) {
-        if (updateApiKeyDto.providerId) {
-          const provider = await this.prisma.aiProvider.findFirst({
-            where: {
-              id: updateApiKeyDto.providerId,
-            },
-          });
+      // 更新数据
+      const updateData: Prisma.ApiKeyUpdateInput = {};
 
-          if (!provider) {
-            throw new NotFoundException(`AI Provider with ID ${updateApiKeyDto.providerId} not found`);
-          }
-          updateData.provider = { connect: { id: updateApiKeyDto.providerId } };
-
-          // 如果同时更新专属渠道，验证渠道属于新的供货商
-          if (updateApiKeyDto.channelId !== undefined && updateApiKeyDto.channelId) {
-            const channel = await this.prisma.channel.findFirst({
-              where: {
-                id: updateApiKeyDto.channelId,
-                providerId: updateApiKeyDto.providerId,
-                deletedAt: null,
-              },
-            });
-
-            if (!channel) {
-              throw new BadRequestException(
-                `Channel with ID ${updateApiKeyDto.channelId} does not belong to provider ${updateApiKeyDto.providerId} or does not exist`
-              );
-            }
-            updateData.channel = { connect: { id: updateApiKeyDto.channelId } };
-          }
-        } else {
-          updateData.provider = { disconnect: true };
-          // 清除供货商时也清除专属渠道
-          if (currentTargetType === ChannelTargetType.PROVIDER) {
-            updateData.channel = { disconnect: true };
-          }
-        }
-      } else if (updateApiKeyDto.channelId !== undefined) {
-        // 只更新 channelId
-        if (updateApiKeyDto.channelId) {
-          // 如果是 PROVIDER 模式，需要验证渠道属于当前供货商
-          if (currentTargetType === ChannelTargetType.PROVIDER) {
-            const currentProviderId = existingApiKey.providerId;
-            if (!currentProviderId) {
-              throw new BadRequestException('Cannot set channel without a provider in PROVIDER mode');
-            }
-
-            const channel = await this.prisma.channel.findFirst({
-              where: {
-                id: updateApiKeyDto.channelId,
-                providerId: currentProviderId,
-                deletedAt: null,
-              },
-            });
-
-            if (!channel) {
-              throw new BadRequestException(
-                `Channel with ID ${updateApiKeyDto.channelId} does not belong to provider ${currentProviderId} or does not exist`
-              );
-            }
-          } else {
-            // CHANNEL 模式，只需验证渠道存在
-            const channel = await this.prisma.channel.findFirst({
-              where: {
-                id: updateApiKeyDto.channelId,
-                deletedAt: null,
-              },
-            });
-
-            if (!channel) {
-              throw new NotFoundException(`Channel with ID ${updateApiKeyDto.channelId} not found`);
-            }
-          }
-          updateData.channel = { connect: { id: updateApiKeyDto.channelId } };
-        } else {
-          updateData.channel = { disconnect: true };
-        }
+      if (updateApiKeyDto.name !== undefined) {
+        updateData.name = updateApiKeyDto.name;
       }
-    }
+      if (updateApiKeyDto.description !== undefined) {
+        updateData.description = updateApiKeyDto.description;
+      }
+      if (updateApiKeyDto.expiresAt !== undefined) {
+        updateData.expiresAt = new Date(updateApiKeyDto.expiresAt);
+      }
+      if (updateApiKeyDto.dailyCostLimit !== undefined) {
+        updateData.dailyCostLimit = new Prisma.Decimal(updateApiKeyDto.dailyCostLimit);
+      }
 
-    const updatedApiKey = await this.prisma.apiKey.update({
-      where: { id },
-      data: updateData,
-      include: {
-        channel: {
-          include: {
-            provider: {
-              select: {
-                id: true,
-                name: true,
-                slug: true,
-                logoUrl: true,
+      // 处理渠道配置更新（使用辅助方法简化逻辑）
+      if (updateApiKeyDto.channelTargetType !== undefined) {
+        // 改变目标类型
+        await this.handleTargetTypeChange(updateApiKeyDto, existingApiKey, updateData);
+      } else {
+        // 只更新渠道配置，不改变目标类型
+        await this.handleChannelConfigUpdate(updateApiKeyDto, existingApiKey, updateData);
+      }
+
+      // 执行更新（使用事务）
+      return await tx.apiKey.update({
+        where: { id },
+        data: updateData,
+        include: {
+          channel: {
+            include: {
+              provider: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                  logoUrl: true,
+                },
               },
             },
           },
         },
-      },
+      });
     });
 
-    // 使更新后的 API Key 缓存失效
+    // 使更新后的 API Key 缓存失效（在事务外，不影响数据一致性）
     if (this.apiKeyCache) {
       this.apiKeyCache.invalidate(updatedApiKey.key);
       this.logger.debug(`Invalidated cache for updated API Key: ${updatedApiKey.name}`);
@@ -1563,5 +1398,200 @@ export class ApiKeysService {
     return {
       available: true,
     };
+  }
+
+  /**
+   * 验证并配置 CHANNEL 模式
+   */
+  private async validateAndConfigureChannelMode(
+    channelId: string | undefined,
+    updateData: Prisma.ApiKeyUpdateInput
+  ): Promise<void> {
+    if (channelId !== undefined) {
+      if (channelId) {
+        // 验证渠道存在
+        const channel = await this.prisma.channel.findFirst({
+          where: { id: channelId, deletedAt: null },
+        });
+        if (!channel) {
+          throw new NotFoundException(`渠道 ${channelId} 不存在`);
+        }
+        updateData.channel = { connect: { id: channelId } };
+      } else {
+        updateData.channel = { disconnect: true };
+      }
+    }
+    // 清除 PROVIDER 模式的关联
+    updateData.provider = { disconnect: true };
+  }
+
+  /**
+   * 验证并配置 PROVIDER 模式
+   */
+  private async validateAndConfigureProviderMode(
+    dto: UpdateApiKeyDto,
+    existingApiKey: any,
+    updateData: Prisma.ApiKeyUpdateInput
+  ): Promise<void> {
+    if (dto.providerId !== undefined) {
+      if (dto.providerId) {
+        // 验证供货商存在
+        const provider = await this.prisma.aiProvider.findFirst({
+          where: { id: dto.providerId },
+        });
+        if (!provider) {
+          throw new NotFoundException(`供货商 ${dto.providerId} 不存在`);
+        }
+        updateData.provider = { connect: { id: dto.providerId } };
+
+        // 如果同时指定了专属渠道，验证渠道属于该供货商
+        if (dto.channelId !== undefined) {
+          if (dto.channelId) {
+            const channel = await this.prisma.channel.findFirst({
+              where: {
+                id: dto.channelId,
+                providerId: dto.providerId,
+                deletedAt: null,
+              },
+            });
+            if (!channel) {
+              throw new BadRequestException(
+                `渠道 ${dto.channelId} 不属于供货商 ${dto.providerId}`
+              );
+            }
+            updateData.channel = { connect: { id: dto.channelId } };
+          } else {
+            updateData.channel = { disconnect: true };
+          }
+        }
+      } else {
+        // 清除供货商和渠道
+        updateData.provider = { disconnect: true };
+        updateData.channel = { disconnect: true };
+      }
+    } else if (dto.channelId !== undefined) {
+      // 只更新专属渠道，验证渠道属于当前供货商
+      const currentProviderId = existingApiKey.providerId;
+      if (!currentProviderId) {
+        throw new BadRequestException('PROVIDER 模式下必须先设置供货商才能设置渠道');
+      }
+
+      if (dto.channelId) {
+        const channel = await this.prisma.channel.findFirst({
+          where: {
+            id: dto.channelId,
+            providerId: currentProviderId,
+            deletedAt: null,
+          },
+        });
+        if (!channel) {
+          throw new BadRequestException(
+            `渠道 ${dto.channelId} 不属于当前供货商 ${currentProviderId}`
+          );
+        }
+        updateData.channel = { connect: { id: dto.channelId } };
+      } else {
+        updateData.channel = { disconnect: true };
+      }
+    }
+  }
+
+  /**
+   * 处理目标类型变更
+   */
+  private async handleTargetTypeChange(
+    dto: UpdateApiKeyDto,
+    existingApiKey: any,
+    updateData: Prisma.ApiKeyUpdateInput
+  ): Promise<void> {
+    updateData.channelTargetType = dto.channelTargetType;
+
+    if (dto.channelTargetType === ChannelTargetType.CHANNEL) {
+      await this.validateAndConfigureChannelMode(dto.channelId, updateData);
+    } else if (dto.channelTargetType === ChannelTargetType.PROVIDER) {
+      await this.validateAndConfigureProviderMode(dto, existingApiKey, updateData);
+    }
+  }
+
+  /**
+   * 处理渠道配置更新（不改变目标类型）
+   */
+  private async handleChannelConfigUpdate(
+    dto: UpdateApiKeyDto,
+    existingApiKey: any,
+    updateData: Prisma.ApiKeyUpdateInput
+  ): Promise<void> {
+    const currentTargetType = existingApiKey.channelTargetType;
+
+    if (dto.providerId !== undefined) {
+      if (dto.providerId) {
+        // 验证供货商存在
+        const provider = await this.prisma.aiProvider.findFirst({
+          where: { id: dto.providerId },
+        });
+        if (!provider) {
+          throw new NotFoundException(`供货商 ${dto.providerId} 不存在`);
+        }
+        updateData.provider = { connect: { id: dto.providerId } };
+
+        // 如果同时更新专属渠道，验证渠道属于新供货商
+        if (dto.channelId !== undefined && dto.channelId) {
+          const channel = await this.prisma.channel.findFirst({
+            where: {
+              id: dto.channelId,
+              providerId: dto.providerId,
+              deletedAt: null,
+            },
+          });
+          if (!channel) {
+            throw new BadRequestException(
+              `渠道 ${dto.channelId} 不属于供货商 ${dto.providerId}`
+            );
+          }
+          updateData.channel = { connect: { id: dto.channelId } };
+        }
+      } else {
+        // 清除供货商
+        updateData.provider = { disconnect: true };
+        if (currentTargetType === ChannelTargetType.PROVIDER) {
+          updateData.channel = { disconnect: true };
+        }
+      }
+    } else if (dto.channelId !== undefined) {
+      // 只更新 channelId
+      if (dto.channelId) {
+        if (currentTargetType === ChannelTargetType.PROVIDER) {
+          // PROVIDER 模式：验证渠道属于当前供货商
+          const currentProviderId = existingApiKey.providerId;
+          if (!currentProviderId) {
+            throw new BadRequestException('PROVIDER 模式下必须先设置供货商才能设置渠道');
+          }
+
+          const channel = await this.prisma.channel.findFirst({
+            where: {
+              id: dto.channelId,
+              providerId: currentProviderId,
+              deletedAt: null,
+            },
+          });
+          if (!channel) {
+            throw new BadRequestException(
+              `渠道 ${dto.channelId} 不属于当前供货商 ${currentProviderId}`
+            );
+          }
+        } else {
+          // CHANNEL 模式：只验证渠道存在
+          const channel = await this.prisma.channel.findFirst({
+            where: { id: dto.channelId, deletedAt: null },
+          });
+          if (!channel) {
+            throw new NotFoundException(`渠道 ${dto.channelId} 不存在`);
+          }
+        }
+        updateData.channel = { connect: { id: dto.channelId } };
+      } else {
+        updateData.channel = { disconnect: true };
+      }
+    }
   }
 }

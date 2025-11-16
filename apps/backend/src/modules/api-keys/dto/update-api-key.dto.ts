@@ -9,6 +9,7 @@ import {
   MaxLength,
   IsPositive,
   ValidateIf,
+  IsNotEmpty,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ChannelTargetType } from '@prisma/client';
@@ -73,8 +74,13 @@ export class UpdateApiKeyDto {
     description: '关联的AI供货商ID（当 targetType=PROVIDER 时使用）',
     example: 'b2c3d4e5-f6g7-h8i9-j0k1-l2m3n4o5p6q7',
   })
-  @IsUUID()
-  @IsOptional()
   @ValidateIf((o) => o.channelTargetType === ChannelTargetType.PROVIDER)
+  @IsNotEmpty({
+    message: 'targetType 为 PROVIDER 时 providerId 是必需的',
+  })
+  @IsUUID(undefined, {
+    message: 'providerId 必须是有效的 UUID',
+  })
+  @IsOptional()
   providerId?: string;
 }

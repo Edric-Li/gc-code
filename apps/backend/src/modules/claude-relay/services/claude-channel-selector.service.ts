@@ -51,15 +51,15 @@ export class ClaudeChannelSelectorService {
         // 自动续期
         await this.sessionStorage.renewMapping(sessionHash);
 
-        // 异步更新最后使用时间
-        this.prisma.channel
-          .update({
+        // 更新最后使用时间（不阻塞返回，但确保操作完成）
+        try {
+          await this.prisma.channel.update({
             where: { id: stickyChannel.id },
             data: { lastUsedAt: new Date() },
-          })
-          .catch((error) => {
-            this.logger.error(`Failed to update channel lastUsedAt: ${error.message}`);
           });
+        } catch (error) {
+          this.logger.error(`Failed to update channel lastUsedAt: ${error.message}`);
+        }
 
         return stickyChannel;
       }
@@ -74,15 +74,15 @@ export class ClaudeChannelSelectorService {
       this.logger.log(`🆕 Created sticky session: ${sessionHash} → ${newChannel.name}`);
     }
 
-    // 6. 异步更新最后使用时间
-    this.prisma.channel
-      .update({
+    // 6. 更新最后使用时间（确保操作完成以保证 LRU 顺序正确）
+    try {
+      await this.prisma.channel.update({
         where: { id: newChannel.id },
         data: { lastUsedAt: new Date() },
-      })
-      .catch((error) => {
-        this.logger.error(`Failed to update channel lastUsedAt: ${error.message}`);
       });
+    } catch (error) {
+      this.logger.error(`Failed to update channel lastUsedAt: ${error.message}`);
+    }
 
     return newChannel;
   }
@@ -224,7 +224,7 @@ export class ClaudeChannelSelectorService {
           status: ChannelStatus.ACTIVE,
         },
         orderBy: [
-          { lastUsedAt: 'asc' },  // 最久未使用优先
+          { lastUsedAt: { sort: 'asc', nulls: 'first' } },  // null 值（从未使用）优先，然后是最久未使用
           { priority: 'asc' },    // 次按优先级
         ],
       });

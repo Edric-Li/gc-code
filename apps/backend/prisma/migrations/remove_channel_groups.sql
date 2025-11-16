@@ -12,7 +12,8 @@ DROP TABLE IF EXISTS "channel_groups";
 
 -- Step 4: Update the ChannelTargetType enum to remove GROUP
 -- First, update any existing records that use GROUP (if any)
-UPDATE "api_keys" SET "channel_target_type" = 'CHANNEL' WHERE "channel_target_type" = 'GROUP';
+-- Use text conversion to handle cases where GROUP value doesn't exist in enum yet
+UPDATE "api_keys" SET "channel_target_type" = 'CHANNEL' WHERE "channel_target_type"::text = 'GROUP';
 
 -- Then recreate the enum type
 -- PostgreSQL doesn't support removing values from enums directly, so we need to:
