@@ -834,9 +834,8 @@ export class ApiKeysService {
     });
 
     // 统计成功和失败的请求
-    // @ts-expect-error - Prisma groupBy type inference issue
     const successFailureStats = await this.prisma.apiKeyRequestLog.groupBy({
-      by: ['status'],
+      by: ['success'],
       where: {
         userId,
         createdAt: { gte: startDate, lte: endDate },
@@ -847,7 +846,7 @@ export class ApiKeysService {
     });
 
     const totalRequests = requestLogStats._count.id || 0;
-    const successCount = successFailureStats.find((s) => s.status === 200)?._count.id || 0;
+    const successCount = successFailureStats.find((s) => s.success === true)?._count.id || 0;
     const failureCount = totalRequests - successCount;
     const totalCost = requestLogStats._sum.cost
       ? parseFloat(requestLogStats._sum.cost.toString())
