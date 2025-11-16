@@ -213,7 +213,18 @@ export class LogService {
     if (params.userId) where.userId = params.userId;
     if (params.method) where.method = params.method;
     if (params.path) where.path = { contains: params.path };
-    if (params.statusCode) where.statusCode = params.statusCode;
+    // 支持状态码范围查询（如 2 代表 200-299，4 代表 400-499）
+    if (params.statusCode) {
+      if (params.statusCode < 10) {
+        // 如果是单个数字，表示范围查询
+        const rangeStart = params.statusCode * 100;
+        const rangeEnd = rangeStart + 99;
+        where.statusCode = { gte: rangeStart, lte: rangeEnd };
+      } else {
+        // 精确匹配
+        where.statusCode = params.statusCode;
+      }
+    }
     if (params.startDate || params.endDate) {
       where.createdAt = {};
       if (params.startDate) where.createdAt.gte = params.startDate;
