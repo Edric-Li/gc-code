@@ -72,7 +72,8 @@ enum KeyStatus {
 enum ChannelStatus {
   ACTIVE // 正常使用
   DISABLED // 已禁用
-  ERROR // 出现错误
+  ERROR // 出现永久性错误（401/403）
+  TEMP_ERROR // 临时错误（5xx，自动恢复）
   MAINTENANCE // 维护中
   RATE_LIMITED // 限流中
 }

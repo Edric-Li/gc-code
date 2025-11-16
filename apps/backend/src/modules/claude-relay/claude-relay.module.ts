@@ -18,6 +18,8 @@ import { UsageQueueService } from './services/usage-queue.service';
 import { RequestLogQueueService } from './services/request-log-queue.service';
 import { RequestLogCleanupService } from './services/request-log-cleanup.service';
 import { PricingService } from './services/pricing.service';
+import { ChannelErrorTrackerService } from './services/channel-error-tracker.service';
+import { ChannelAutoRecoveryService } from './services/channel-auto-recovery.service';
 
 @Module({
   imports: [
@@ -45,6 +47,9 @@ import { PricingService } from './services/pricing.service';
     RequestLogQueueService, // 请求日志批量队列
     RequestLogCleanupService, // 请求日志定时清理服务
     PricingService, // 动态定价服务
+    // 🔧 错误处理和自动恢复
+    ChannelErrorTrackerService, // 渠道错误追踪服务
+    ChannelAutoRecoveryService, // 渠道自动恢复服务
     ClaudeChannelSelectorService,
     ClaudeProxyService,
     UsageTrackingService,

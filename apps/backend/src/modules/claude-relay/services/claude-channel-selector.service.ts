@@ -6,6 +6,7 @@ import { ISessionStorageService } from './session-storage/session-storage.interf
 import { SESSION_STORAGE_SERVICE } from '../constants';
 import { ApiKeyInfo, ClaudeMessagesRequest } from '../interfaces/claude-api.interface';
 import { ChannelPoolCacheService } from './channel-pool-cache.service';
+import { ChannelErrorTrackerService } from './channel-error-tracker.service';
 
 @Injectable()
 export class ClaudeChannelSelectorService {
@@ -15,6 +16,7 @@ export class ClaudeChannelSelectorService {
     private prisma: PrismaService,
     private sessionHashService: SessionHashService,
     private channelPoolCache: ChannelPoolCacheService,
+    private errorTracker: ChannelErrorTrackerService,
     @Inject(SESSION_STORAGE_SERVICE) private sessionStorage: ISessionStorageService
   ) {}
 
@@ -177,7 +179,7 @@ export class ClaudeChannelSelectorService {
   }
 
   /**
-   * 标记渠道为错误状态
+   * 标记渠道为永久性错误状态（401/403）
    */
   async markChannelError(channelId: string) {
     await this.prisma.channel.update({
@@ -190,7 +192,48 @@ export class ClaudeChannelSelectorService {
 
     // 从缓存池中移除该渠道
     this.channelPoolCache.markChannelUnavailable(channelId);
-    this.logger.log(`Channel ${channelId} marked as error and removed from cache`);
+    // 清除错误计数
+    this.errorTracker.clearErrors(channelId);
+    this.logger.log(`Channel ${channelId} marked as ERROR (permanent) and removed from cache`);
+  }
+
+  /**
+   * 标记渠道为临时错误状态（5xx）
+   * @param channelId 渠道 ID
+   * @param errorCount 当前错误次数
+   */
+  async markChannelTempError(channelId: string, errorCount: number) {
+    await this.prisma.channel.update({
+      where: { id: channelId },
+      data: {
+        status: ChannelStatus.TEMP_ERROR,
+        lastErrorAt: new Date(),
+        errorCount,
+      },
+    });
+
+    // 从缓存池中移除该渠道
+    this.channelPoolCache.markChannelUnavailable(channelId);
+    this.logger.warn(
+      `Channel ${channelId} marked as TEMP_ERROR (${errorCount} errors) and removed from cache`
+    );
+  }
+
+  /**
+   * 记录 5xx 服务器错误
+   * @param channelId 渠道 ID
+   * @returns 是否超过阈值需要标记为 TEMP_ERROR
+   */
+  async recordServerError(channelId: string): Promise<boolean> {
+    const errorCount = this.errorTracker.recordServerError(channelId);
+    const exceedsThreshold = this.errorTracker.exceedsThreshold(channelId);
+
+    if (exceedsThreshold) {
+      await this.markChannelTempError(channelId, errorCount);
+      return true;
+    }
+
+    return false;
   }
 
   /**
