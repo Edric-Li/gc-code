@@ -53,7 +53,7 @@ RUN pnpm prisma generate
 RUN pnpm run build
 
 # 清理开发依赖，只保留生产依赖
-RUN CI=true pnpm prune --prod
+RUN CI=true pnpm prune --prod --ignore-scripts
 
 # ================================
 # 生产阶段 - 运行环境
