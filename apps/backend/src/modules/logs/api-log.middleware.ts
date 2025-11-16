@@ -136,6 +136,9 @@ export class ApiLogMiddleware implements NestMiddleware {
       // 获取用户 ID（JWT 策略返回完整的 user 对象）
       const userId = req.user?.id;
 
+      // 获取请求头（过滤敏感信息）
+      const requestHeaders = this.sanitizeHeaders(req.headers as Record<string, unknown>);
+
       // 获取请求体（过滤敏感信息）
       let requestBody: Record<string, unknown> | undefined;
       if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
@@ -153,6 +156,7 @@ export class ApiLogMiddleware implements NestMiddleware {
         duration,
         ipAddress,
         userAgent,
+        requestHeaders,
         requestBody,
         errorMessage,
       });
@@ -161,6 +165,34 @@ export class ApiLogMiddleware implements NestMiddleware {
     }
   }
 
+  /**
+   * 脱敏请求头
+   */
+  private sanitizeHeaders(headers: Record<string, unknown>): Record<string, unknown> {
+    const sensitiveHeaderKeys = [
+      'authorization',
+      'cookie',
+      'set-cookie',
+      'x-api-key',
+      'x-auth-token',
+      'proxy-authorization',
+    ];
+    const sanitized: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(headers)) {
+      if (sensitiveHeaderKeys.some((k) => key.toLowerCase() === k.toLowerCase())) {
+        sanitized[key] = '[REDACTED]';
+      } else {
+        sanitized[key] = value;
+      }
+    }
+
+    return sanitized;
+  }
+
+  /**
+   * 脱敏请求体
+   */
   private sanitizeBody(body: Record<string, unknown>): Record<string, unknown> {
     const sensitiveKeys = ['password', 'token', 'secret', 'apiKey', 'api_key', 'authorization'];
     const sanitized: Record<string, unknown> = {};

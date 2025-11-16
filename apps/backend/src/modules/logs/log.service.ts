@@ -79,6 +79,7 @@ export class LogService {
     duration: number;
     ipAddress?: string;
     userAgent?: string;
+    requestHeaders?: Record<string, unknown>;
     requestBody?: Record<string, unknown>;
     errorMessage?: string;
   }) {
@@ -92,6 +93,7 @@ export class LogService {
           duration: data.duration,
           ipAddress: data.ipAddress,
           userAgent: data.userAgent,
+          requestHeaders: data.requestHeaders as Prisma.InputJsonValue,
           requestBody: data.requestBody as Prisma.InputJsonValue,
           errorMessage: data.errorMessage,
         },

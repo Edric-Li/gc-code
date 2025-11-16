@@ -191,10 +191,11 @@ model ApiLog {
   statusCode   Int        @map("status_code")
   duration     Int // 毫秒
   ipAddress    String?    @map("ip_address") @db.VarChar(100)
-  userAgent    String?    @map("user_agent") @db.Text
-  requestBody  Json?      @map("request_body")
-  responseBody Json?      @map("response_body")
-  errorMessage String?    @map("error_message") @db.Text
+  userAgent      String? @map("user_agent") @db.Text
+  requestHeaders Json?   @map("request_headers")
+  requestBody    Json?   @map("request_body")
+  responseBody   Json?   @map("response_body")
+  errorMessage   String? @map("error_message") @db.Text
   createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamp(3)
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
