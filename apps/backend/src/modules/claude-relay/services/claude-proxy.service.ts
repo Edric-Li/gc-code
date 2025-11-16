@@ -200,7 +200,7 @@ export class ClaudeProxyService {
     };
     const status = axiosError.response?.status;
 
-    // 429: 限流
+    // 429: 限流（临时）
     if (status === 429) {
       const resetHeader = axiosError.response?.headers?.['x-ratelimit-reset'];
       const resetTimestamp = resetHeader ? parseInt(resetHeader, 10) : undefined;
@@ -211,15 +211,21 @@ export class ClaudeProxyService {
         `Channel ${channel.name} rate limited, reset at: ${resetTimestamp ? new Date(resetTimestamp * 1000) : 'unknown'}`
       );
     }
-    // 401, 403: 认证失败
+    // 401, 403: 认证失败（永久性错误）
     else if (status === 401 || status === 403) {
       await this.channelSelector.markChannelError(channel.id);
-      this.logger.error(`Channel ${channel.name} authentication failed (${status})`);
+      this.logger.error(`Channel ${channel.name} authentication failed (${status}) - marked as ERROR`);
     }
-    // 500+: 服务器错误
+    // 500+: 服务器错误（临时错误，追踪错误次数）
     else if (status >= 500) {
-      await this.channelSelector.markChannelError(channel.id);
-      this.logger.error(`Channel ${channel.name} server error (${status})`);
+      const marked = await this.channelSelector.recordServerError(channel.id);
+      if (marked) {
+        this.logger.error(
+          `Channel ${channel.name} exceeded server error threshold - marked as TEMP_ERROR (auto-recover in 5 min)`
+        );
+      } else {
+        this.logger.warn(`Channel ${channel.name} server error (${status}) - error recorded`);
+      }
     }
   }
 }
