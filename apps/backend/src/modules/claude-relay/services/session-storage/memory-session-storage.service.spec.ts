@@ -4,7 +4,6 @@ import { MemorySessionStorageService } from './memory-session-storage.service';
 
 describe('MemorySessionStorageService', () => {
   let service: MemorySessionStorageService;
-  let configService: ConfigService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -27,7 +26,6 @@ describe('MemorySessionStorageService', () => {
     }).compile();
 
     service = module.get<MemorySessionStorageService>(MemorySessionStorageService);
-    configService = module.get<ConfigService>(ConfigService);
 
     // 初始化服务
     service.onModuleInit();
@@ -176,7 +174,7 @@ describe('MemorySessionStorageService', () => {
     it('should cleanup expired sessions', async () => {
       // 创建一些会话
       const mapping1 = await service.setMapping('hash1', 'channel1', 'key1');
-      const mapping2 = await service.setMapping('hash2', 'channel2', 'key2');
+      await service.setMapping('hash2', 'channel2', 'key2');
 
       // 手动设置一个为已过期
       mapping1.expiresAt = new Date(Date.now() - 1000);

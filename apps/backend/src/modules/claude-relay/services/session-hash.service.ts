@@ -36,7 +36,7 @@ export class SessionHashService {
   private extractHashContent(
     messages: ClaudeMessage[],
     messageCount: number,
-    includeSystemPrompt: boolean
+    _includeSystemPrompt: boolean
   ): string {
     // 过滤消息
     const filteredMessages = messages;

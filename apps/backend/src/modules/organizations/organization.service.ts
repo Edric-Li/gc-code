@@ -2,7 +2,6 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
-  ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
@@ -276,7 +275,7 @@ export class OrganizationService {
     return organization;
   }
 
-  async update(id: string, updateDto: UpdateOrganizationDto, userId: string) {
+  async update(id: string, updateDto: UpdateOrganizationDto, _userId: string) {
     // 系统管理员权限已在控制器层检查，这里直接更新
 
     // 如果更新了父组织，检查父组织是否存在，并防止循环引用
@@ -350,7 +349,7 @@ export class OrganizationService {
     });
   }
 
-  async remove(id: string, userId: string) {
+  async remove(id: string, _userId: string) {
     // 系统管理员权限已在控制器层检查，这里直接删除
 
     // 检查是否有子组织
@@ -371,7 +370,7 @@ export class OrganizationService {
     return { message: 'Organization deleted successfully' };
   }
 
-  async addMember(organizationId: string, addMemberDto: AddMemberDto, requesterId: string) {
+  async addMember(organizationId: string, addMemberDto: AddMemberDto, _requesterId: string) {
     // 系统管理员权限已在控制器层检查
 
     // 检查用户是否存在
@@ -424,7 +423,7 @@ export class OrganizationService {
     organizationId: string,
     memberId: string,
     updateDto: UpdateMemberRoleDto,
-    requesterId: string
+    _requesterId: string
   ) {
     // 系统管理员权限已在控制器层检查
     const member = await this.prisma.organizationMember.findUnique({
@@ -452,7 +451,7 @@ export class OrganizationService {
     });
   }
 
-  async removeMember(organizationId: string, memberId: string, requesterId: string) {
+  async removeMember(organizationId: string, memberId: string, _requesterId: string) {
     // 系统管理员权限已在控制器层检查
     const targetMember = await this.prisma.organizationMember.findUnique({
       where: { id: memberId },
