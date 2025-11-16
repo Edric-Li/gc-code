@@ -30,28 +30,30 @@ FROM node:20-alpine AS backend-builder
 # 安装 OpenSSL（Prisma 需要）
 RUN apk add --no-cache openssl
 
+# 安装 pnpm
+RUN npm install -g pnpm
+
 WORKDIR /app
 
-# 复制后端 package 文件
-COPY apps/backend/package*.json ./
+# 复制 workspace 配置文件
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY apps/backend/package.json ./apps/backend/
 
 # 安装后端依赖（包括 devDependencies 用于构建）
-# 设置 npm 超时和重试次数
-RUN npm config set fetch-retry-mintimeout 20000 && \
-    npm config set fetch-retry-maxtimeout 120000 && \
-    npm ci
+RUN pnpm install --frozen-lockfile --filter @gc-code/backend
 
 # 复制后端源代码和 Prisma schema
-COPY apps/backend/ ./
+COPY apps/backend/ ./apps/backend/
 
 # 生成 Prisma Client
-RUN npx prisma generate
+WORKDIR /app/apps/backend
+RUN pnpm prisma generate
 
 # 构建后端应用
-RUN npm run build
+RUN pnpm run build
 
 # 清理开发依赖，只保留生产依赖
-RUN npm ci --only=production && npm cache clean --force
+RUN pnpm prune --prod
 
 # ================================
 # 生产阶段 - 运行环境
@@ -64,10 +66,10 @@ RUN apk add --no-cache nginx supervisor openssl
 WORKDIR /app
 
 # 从后端构建阶段复制必要文件
-COPY --from=backend-builder /app/dist ./backend/dist
-COPY --from=backend-builder /app/node_modules ./backend/node_modules
-COPY --from=backend-builder /app/package*.json ./backend/
-COPY --from=backend-builder /app/prisma ./backend/prisma
+COPY --from=backend-builder /app/apps/backend/dist ./backend/dist
+COPY --from=backend-builder /app/apps/backend/node_modules ./backend/node_modules
+COPY --from=backend-builder /app/apps/backend/package.json ./backend/
+COPY --from=backend-builder /app/apps/backend/prisma ./backend/prisma
 
 # 从前端构建阶段复制构建产物
 COPY --from=frontend-builder /app/apps/frontend/dist ./frontend/dist
