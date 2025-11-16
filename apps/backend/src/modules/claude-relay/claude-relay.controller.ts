@@ -142,9 +142,12 @@ export class ClaudeRelayController {
     if (success && result.data) {
       const responseData = result.data as ClaudeMessagesResponse;
       if (responseData.usage) {
+        // 优先使用响应中的模型，如果没有则使用请求的模型
+        const actualModel = responseData.model || body.model;
+
         // 计算费用 (支持 Prompt Caching)
         const cost = this.usageTracking.calculateCost({
-          model: body.model,
+          model: actualModel,
           inputTokens: responseData.usage.input_tokens,
           outputTokens: responseData.usage.output_tokens,
           cacheCreationTokens: responseData.usage.cache_creation_input_tokens,
@@ -173,7 +176,7 @@ export class ClaudeRelayController {
             userId: apiKey.user.id,
             channelId: apiKey.channelId || undefined,
             requestId,
-            model: body.model,
+            model: actualModel,
             inputTokens: responseData.usage.input_tokens,
             outputTokens: responseData.usage.output_tokens,
             cacheCreationInputTokens: responseData.usage.cache_creation_input_tokens,
@@ -186,7 +189,8 @@ export class ClaudeRelayController {
             ipAddress: this.getClientIp(res.req),
             userAgent: headers['user-agent'],
             metadata: {
-              model: body.model,
+              model: actualModel,
+              requestedModel: body.model, // 保留请求的模型名用于对比
               stopReason: responseData.stop_reason,
             },
           })
@@ -236,6 +240,7 @@ export class ClaudeRelayController {
     let cacheCreation:
       | { ephemeral_5m_input_tokens?: number; ephemeral_1h_input_tokens?: number }
       | undefined;
+    let actualModel: string | undefined; // 从响应中提取的实际模型
     let isSuccess = true;
     let firstTokenReceived = false;
 
@@ -261,11 +266,16 @@ export class ClaudeRelayController {
           try {
             const data = JSON.parse(line.substring(6));
 
-            // message_start事件包含input tokens (包括缓存)
+            // message_start事件包含input tokens (包括缓存) 和实际使用的模型
             if (data.type === 'message_start' && data.message?.usage) {
               totalInputTokens = data.message.usage.input_tokens || 0;
               totalCacheCreationTokens = data.message.usage.cache_creation_input_tokens || 0;
               totalCacheReadTokens = data.message.usage.cache_read_input_tokens || 0;
+              // 提取实际使用的模型
+              if (data.message.model) {
+                actualModel = data.message.model;
+                this.logger.debug(`Captured actual model from response: ${actualModel}`);
+              }
               // Extended Prompt Caching
               if (data.message.usage.cache_creation) {
                 cacheCreation = data.message.usage.cache_creation;
@@ -308,8 +318,11 @@ export class ClaudeRelayController {
 
       // 记录用量 (包括缓存)
       if (isSuccess && (totalInputTokens > 0 || totalOutputTokens > 0)) {
+        // 优先使用响应中的模型，如果没有则使用请求的模型
+        const modelToRecord = actualModel || body.model;
+
         const cost = this.usageTracking.calculateCost({
-          model: body.model,
+          model: modelToRecord,
           inputTokens: totalInputTokens,
           outputTokens: totalOutputTokens,
           cacheCreationTokens: totalCacheCreationTokens,
@@ -338,7 +351,7 @@ export class ClaudeRelayController {
             userId: apiKey.user.id,
             channelId: channel.id,
             requestId,
-            model: body.model,
+            model: modelToRecord,
             inputTokens: totalInputTokens,
             outputTokens: totalOutputTokens,
             cacheCreationInputTokens: totalCacheCreationTokens,
@@ -351,7 +364,8 @@ export class ClaudeRelayController {
             ipAddress: this.getClientIp(res.req),
             userAgent: headers['user-agent'],
             metadata: {
-              model: body.model,
+              model: modelToRecord,
+              requestedModel: body.model, // 保留请求的模型名用于对比
               stream: true,
             },
           })
@@ -362,6 +376,7 @@ export class ClaudeRelayController {
         this.logger.debug(
           `Stream usage: ${totalInputTokens} input + ${totalOutputTokens} output + ` +
             `${totalCacheCreationTokens} cache_write + ${totalCacheReadTokens} cache_read tokens, ` +
+            `model: ${modelToRecord}${actualModel && actualModel !== body.model ? ` (requested: ${body.model})` : ''}, ` +
             `cost: $${cost.toFixed(6)}, duration: ${duration}ms, TTFT: ${timeToFirstToken}ms`
         );
       }
