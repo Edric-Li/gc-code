@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { CreateUserDto } from './dto/create-user.dto';
 import { Prisma, Role } from '@prisma/client';
 
 @Injectable()
@@ -113,6 +114,91 @@ export class UserService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
+
+    return user;
+  }
+
+  async create(createUserDto: CreateUserDto) {
+    // 检查邮箱是否已被使用
+    const emailExists = await this.prisma.user.findUnique({
+      where: { email: createUserDto.email },
+    });
+
+    if (emailExists) {
+      throw new ConflictException('Email already exists');
+    }
+
+    // 如果提供了用户名，检查是否已被使用
+    if (createUserDto.username) {
+      const usernameExists = await this.prisma.user.findUnique({
+        where: { username: createUserDto.username },
+      });
+
+      if (usernameExists) {
+        throw new ConflictException('Username already exists');
+      }
+    }
+
+    // 如果没有提供用户名，使用邮箱前缀作为默认用户名
+    let username = createUserDto.username;
+    if (!username) {
+      // 清理邮箱前缀，只保留字母、数字和下划线，并限制长度
+      const baseUsername = createUserDto.email
+        .split('@')[0]
+        .replace(/[^a-zA-Z0-9_]/g, '_')
+        .substring(0, 90); // 限制长度，留空间给后缀
+
+      username = baseUsername;
+
+      // 循环直到找到唯一的用户名
+      let attempt = 0;
+      let existingUser = await this.prisma.user.findUnique({
+        where: { username },
+      });
+
+      while (existingUser) {
+        // 添加随机后缀确保唯一性
+        const randomSuffix = Math.random().toString(36).substring(2, 8);
+        username = `${baseUsername}_${randomSuffix}`;
+
+        // 再次检查唯一性
+        existingUser = await this.prisma.user.findUnique({
+          where: { username },
+        });
+
+        attempt++;
+        if (attempt > 10) {
+          // 防止无限循环，使用时间戳作为后备方案
+          username = `${baseUsername}_${Date.now()}`;
+          break;
+        }
+      }
+    }
+
+    // 创建用户
+    const user = await this.prisma.user.create({
+      data: {
+        email: createUserDto.email,
+        username,
+        displayName: createUserDto.displayName || null,
+        avatarUrl: createUserDto.avatarUrl || null,
+        role: createUserDto.role || Role.USER,
+        isActive: createUserDto.isActive !== undefined ? createUserDto.isActive : true,
+        passwordHash: null, // 预创建的用户没有密码，需要通过 OAuth 登录
+      },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        displayName: true,
+        avatarUrl: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        lastLoginAt: true,
+      },
+    });
 
     return user;
   }

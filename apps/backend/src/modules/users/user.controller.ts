@@ -1,6 +1,7 @@
-import { Controller, Get, Put, Delete, Param, Body, Query, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, Req } from '@nestjs/common';
 import { UserService } from './user.service';
 import { UpdateUserDto, QueryUsersDto } from './dto/update-user.dto';
+import { CreateUserDto } from './dto/create-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -26,6 +27,33 @@ export class UserController {
   @Get('simple-list')
   getSimpleList(@Query('search') search?: string) {
     return this.userService.getSimpleList(search);
+  }
+
+  @Post()
+  async create(
+    @Body() createUserDto: CreateUserDto,
+    @CurrentUser() currentUser: { id: string },
+    @Req() req: Request
+  ) {
+    const result = await this.userService.create(createUserDto);
+
+    // 记录审计日志
+    await this.logService.logAudit({
+      userId: currentUser.id,
+      action: AuditAction.CREATE,
+      resource: 'User',
+      resourceId: result.id,
+      description: `预创建用户 ${result.email}`,
+      changes: {
+        email: result.email,
+        username: result.username,
+        role: result.role,
+      },
+      ipAddress: req.ip || req.socket.remoteAddress,
+      userAgent: req.headers['user-agent'],
+    });
+
+    return result;
   }
 
   @Get()
