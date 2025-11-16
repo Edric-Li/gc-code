@@ -60,8 +60,8 @@ RUN CI=true pnpm prune --prod --ignore-scripts
 # ================================
 FROM node:20-alpine
 
-# 安装 nginx、supervisor 和 OpenSSL（Prisma 运行时需要）
-RUN apk add --no-cache nginx supervisor openssl
+# 安装 nginx、supervisor、OpenSSL 和编译工具（bcrypt 需要编译）
+RUN apk add --no-cache nginx supervisor openssl python3 make g++
 
 WORKDIR /app
 
@@ -72,8 +72,9 @@ COPY --from=backend-builder /app/apps/backend/prisma ./backend/prisma
 
 # 安装生产依赖（使用 npm 而非 pnpm，避免 workspace 符号链接问题）
 WORKDIR /app/backend
-RUN npm install --omit=dev --ignore-scripts && \
-    npx prisma generate
+RUN npm install --omit=dev && \
+    npx prisma generate && \
+    apk del python3 make g++
 
 WORKDIR /app
 
